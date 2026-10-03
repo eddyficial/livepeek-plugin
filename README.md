@@ -59,9 +59,7 @@ stale after an update:
 - `bin/peek` for Bash, Zsh and the shell inside tmux or Zellij
 - `bin/peek.cmd` for PowerShell and cmd on Windows
 
-Copy whichever you need into a folder that is on your PATH. On Windows, the
-folder `npm` already put on your PATH works for every shell at once; run
-`npm config get prefix` to see where it is, then copy both files into it:
+Copy whichever you need into any folder that is already on your PATH:
 
 ```
 copy bin\peek.cmd <that folder>

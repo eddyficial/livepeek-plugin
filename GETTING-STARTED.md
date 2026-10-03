@@ -80,7 +80,7 @@ building — a phone frame around it would misrepresent it.
 You do not have to be in a Claude session. A one-word `peek` command works
 from any shell once you copy a wrapper from the plugin's `bin/` folder onto
 your PATH: `bin/peek.cmd` for PowerShell, `bin/peek` for Bash and the shells
-inside tmux and Zellij. On Windows, dropping both into the folder `npm config get prefix` prints covers
+inside tmux and Zellij. On Windows, dropping both into a folder that is already on your PATH covers
 every shell at once. After that, `peek` in a project folder opens the pane
 and `peek --quit` closes it. The README has the exact copy commands.
 
