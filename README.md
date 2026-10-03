@@ -138,7 +138,7 @@ Under tmux, graphics need passthrough enabled:
 set -g allow-passthrough on
 ```
 
-**Zellij on Windows** shows no sixel or kitty graphics, so peek falls back to half-block text there and says so in the footer. For a sharp picture on Windows, run peek from a Windows Terminal pane directly; Zellij on macOS and Linux is unaffected.
+**No graphics? You get the page as text.** Some hosts cannot draw images at all (Zellij on Windows is one; it passes the terminal's sixel reply through but renders nothing). There peek lays the page out as text instead: headings, paragraphs, lists, links and buttons, wrapped to the pane. Scrolling scrolls, clicking a link or button clicks it, `i` types into a focused field. It is a reader, not a picture, so layout and colour are gone, but every word is legible. `b` cycles kitty, sixel, text and half-blocks if the automatic choice is wrong. For a sharp picture on Windows, run peek from a Windows Terminal pane directly.
 
 One pane follows you between terminals too. If you open peek in Windows
 Terminal, then move into Zellij and run it again, the old pane is closed and a
@@ -163,7 +163,7 @@ Focus the pane first — `alt`+arrow in most terminals, `prefix`+arrow in tmux.
 | `+` `-` `0` | zoom in / out / reset |
 | `c` | copy the frame to the clipboard as an image |
 | `.` | pause refreshing |
-| `b` | cycle renderer |
+| `b` | cycle renderer: kitty, sixel, text, half-blocks |
 | `q` | quit and close the pane |
 
 In the preset picker: `↑`/`↓` move, `PageUp`/`PageDown` jump, `Home`/`End` go

@@ -33,6 +33,7 @@ import { probeTerminal, pickRenderer } from './lib/caps.mjs';
 import * as session from './lib/session.mjs';
 import { serveStatic } from './lib/serve.mjs';
 import * as projects from './lib/projects.mjs';
+import { EXTRACT, layoutText } from './lib/textview.mjs';
 import { encodePng } from './lib/pngenc.mjs';
 import { phoneGeometry, composePhone } from './lib/phone.mjs';
 import { bareGeometry, composeBare } from './lib/bare.mjs';
@@ -258,6 +259,9 @@ let errors = [];           // console errors and uncaught exceptions on the page
 let lastFrameAt = 0;       // when the browser last answered a screenshot
 let colorScheme = null;    // null = page default, 'dark' | 'light' when forced
 let zoom = 1;
+let textLines = [];        // text renderer: laid-out lines of the current page
+let textScroll = 0;        // first line shown
+let lastTextKey = '';      // JSON of the last extraction, for change detection
 let lastStatus = null;
 let paused = false;
 // half-blocks until the terminal tells us it can do better - the old default
@@ -747,7 +751,32 @@ async function menuSelect(pos) {
   return applyViewport();
 }
 
+/** Paint the page as text. Rows map to lines; spans remember what is clickable. */
+function paintText(L) {
+  const width = Math.max(10, L.cols - 4);
+  const rows = Math.max(1, L.rows - 3);
+  textScroll = Math.max(0, Math.min(textScroll, Math.max(0, textLines.length - rows)));
+  for (let r = 0; r < rows; r++) {
+    const ln = textLines[textScroll + r];
+    out(`${ESC}[${2 + r};1H${ESC}[2K`);
+    if (ln) out(`  ${ln.text.slice(0, width + 200)}`);   // ANSI codes are not cells; the layout already fits
+  }
+  if (textLines.length > rows) {
+    const pct = Math.round(100 * Math.min(1, (textScroll + rows) / textLines.length));
+    out(`${ESC}[${L.rows - 1};${Math.max(1, L.cols - 6)}H${C.dim(String(pct).padStart(3) + '%')}`);
+  }
+}
+
+/** Which element sits under a cell, in text mode. */
+function textHit(col, row) {
+  const ln = textLines[textScroll + (row - 2)];
+  if (!ln) return null;
+  const c = col - 3;                 // two cells of margin, 1-based columns
+  return ln.spans.find(s => c >= s.c0 && c < s.c1) || null;
+}
+
 function paintImage(L, composed) {
+  if (renderMode === 'text') { paintText(L); return; }
   if (renderMode === 'blocks') {
     const img = resize(composed, L.imgCols, L.imgRows * 2);
     toHalfBlocks(img).forEach((line, i) => {
@@ -772,13 +801,20 @@ function paintImage(L, composed) {
  * reach a mode the probe ruled out.
  */
 function cycleRenderer() {
-  const order = ['kitty', 'sixel', 'blocks'];
+  const order = ['kitty', 'sixel', 'text', 'blocks'];
   renderMode = order[(order.indexOf(renderMode) + 1) % order.length];
-  lastShot = null;
+  lastShot = null; lastTextKey = ''; textScroll = 0;
   dirty = true;
 }
 
 function render(L, shotPng) {
+  if (renderMode === 'text') {
+    L.screenRect = null;
+    paintText(L);
+    lastComposed = null;
+    if (SNAPSHOT) writeSnapshot(SNAPSHOT);
+    return;
+  }
   const geom = L.geom;
   const sw = Math.max(1, Math.round(geom.screenW * L.scale));
   const sh = Math.max(1, Math.round(geom.screenH * L.scale));
@@ -821,7 +857,18 @@ async function tick(force = false) {
       new Promise((_, rej) => setTimeout(() => rej(new Error('page not responding')), 4000)),
     ]);
     lastFrameAt = Date.now();
-    const changed = !lastShot || Buffer.compare(shot, lastShot) !== 0;
+    let changed = !lastShot || Buffer.compare(shot, lastShot) !== 0;
+
+    if (renderMode === 'text') {
+      // the picture is only kept for snapshots; what we paint is the DOM
+      const ex = await page.evaluate(EXTRACT);
+      const key = JSON.stringify(ex.blocks);
+      if (key !== lastTextKey || dirty) {
+        lastTextKey = key;
+        textLines = layoutText(ex.blocks, Math.max(10, L.cols - 4));
+        changed = true;
+      } else changed = false;
+    }
 
     if (changed || dirty) {
       lastShot = shot;
@@ -892,6 +939,30 @@ async function handleMouse(code, col, row, press) {
   const moving = (code & 32) !== 0;
   const wheel = (code & 64) !== 0;
 
+  if (wheel && renderMode === 'text') {
+    const dir = code & 3;
+    textScroll += dir === 0 ? -3 : dir === 1 ? 3 : 0;
+    paintText(lastLayout || layout());
+    return;
+  }
+  if (press && renderMode === 'text' && button === 0) {
+    if (headerHit && row === headerHit.row && col >= headerHit.col0 && col <= headerHit.col1) { openMenu(); return; }
+    const hit = textHit(col, row);
+    if (!hit) return;
+    try {
+      await page.evaluate((id) => {
+        const el = document.querySelector('[data-peek-id="' + id + '"]');
+        if (!el) return;
+        el.scrollIntoView({ block: 'center' });
+        if (el.matches('input,textarea,select')) { el.focus(); if (el.type === 'checkbox' || el.type === 'radio') el.click(); }
+        else el.click();
+      }, hit.id);
+    } catch { /* mid-navigation */ }
+    lastTextKey = '';
+    await tick(true);
+    return;
+  }
+  if (moving && renderMode === 'text') return;
   if (wheel) {
     if (!pt) return;
     const dir = code & 3;                        // 0 up, 1 down, 2 left, 3 right
@@ -996,7 +1067,7 @@ const HELP = [
   ['d',       'dark / light  (flips prefers-color-scheme)'],
   ['+  -',    'zoom in / out  (0 resets)'],
   ['c',       'copy the frame to the clipboard'],
-  ['b',       'change renderer if the picture looks wrong'],
+  ['b',       'change renderer: kitty, sixel, text, half-blocks'],
   ['shift+?', 'this help'],
   ['q',       'quit'],
   ['',        ''],
@@ -1336,6 +1407,7 @@ async function main() {
   page.on('framenavigated', f => {
     if (f !== page.mainFrame()) return;
     errors = [];
+    lastTextKey = ''; textScroll = 0;
     applyPageState();        // zoom and focus ring do not survive a navigation
   });
 

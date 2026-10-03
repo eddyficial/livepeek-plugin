@@ -117,7 +117,7 @@ function applyEnvHints(caps) {
   if (process.env.ZELLIJ !== undefined && process.platform === 'win32') {
     caps.sixel = false;
     caps.kitty = false;
-    caps.note = 'zellij on windows shows no graphics: text mode (b to try anyway)';
+    caps.note = 'zellij on windows shows no graphics: showing the page as text';
   }
 
   caps.tmux = !!process.env.TMUX;
@@ -139,5 +139,7 @@ export function pickRenderer(caps, requested = 'auto') {
   if (caps.tmux && caps.sixel) return 'sixel';
   if (caps.kitty) return 'kitty';
   if (caps.sixel) return 'sixel';
-  return 'blocks';
+  // No graphics at all: text is readable, half-blocks are not. b cycles to
+  // blocks for the rare page where the picture matters more than the words.
+  return 'text';
 }

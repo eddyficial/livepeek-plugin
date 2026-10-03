@@ -107,7 +107,7 @@ Once it's focused:
 | `+` `-` `0` | zoom in, out, reset |
 | `c` | copy what you see to the clipboard |
 | `.` | pause updating |
-| `b` | change renderer |
+| `b` | change renderer (kitty, sixel, text, half-blocks) |
 | `q` | quit and close the pane |
 
 In the viewport picker, `↑`/`↓` move the selection and `enter` picks it.

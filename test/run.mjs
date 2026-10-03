@@ -131,6 +131,27 @@ await test('serveStatic renders README.md with an h1 and live reload', async () 
   assert(text.includes('/__peek/stamp'), 'live-reload script missing');
 });
 
+await test('textview.layoutText wraps, keeps spans, bullets and rules', async () => {
+  const { layoutText } = await lib('textview.mjs');
+  const width = 40;
+  const blocks = [
+    { kind: 'h1', parts: [{ text: 'Title' }] },
+    { kind: 'p', parts: [{ text: 'Read the ' }, { text: 'docs', id: '1', role: 'link' }, { text: ' now and keep going with more words so the line wraps around the width' }] },
+    { kind: 'li', parts: [{ text: 'one' }] },
+    { kind: 'hr', parts: [{ text: '—' }] },
+  ];
+  const lines = layoutText(blocks, width);
+  const plain = (l) => l.text.replace(/\x1b\[[0-9;]*m/g, '');
+  eq(plain(lines[0]), 'Title', 'first line');
+  for (const l of lines) assert(plain(l).length <= width, 'line too wide: ' + JSON.stringify(plain(l)));
+  const linked = lines.find(l => l.spans.some(sp => sp.id === '1' && sp.role === 'link'));
+  assert(linked, 'no line with link span id 1');
+  const sp = linked.spans.find(x => x.id === '1' && x.role === 'link');
+  eq(plain(linked).slice(sp.c0, sp.c1), 'docs', 'span range text');
+  assert(lines.some(l => plain(l).startsWith('  • one')), 'no bullet line');
+  assert(lines.some(l => /^─+$/.test(plain(l))), 'no hr line');
+});
+
 // ---------------------------------------------------------- b. launcher ----
 await test('pane --dry-run in a folder with index.html -> static', () => {
   const dir = tmpdir('dry-static');
@@ -248,6 +269,42 @@ await test('browser: title, live reload, screenshot', async () => {
     const png = await page.screenshot();
     assert(png.length > 1024, `screenshot too small: ${png.length} bytes`);
     eq(Array.from(png.subarray(0, 4)), [0x89, 0x50, 0x4e, 0x47], 'PNG signature');
+  } finally {
+    await browser.close().catch(() => {});
+  }
+});
+
+await test('browser: textview EXTRACT finds blocks, links, buttons, inputs', async () => {
+  const exes = browserCandidates();
+  if (!exes.length) return { skip: 'no Chromium found; set PEEK_BROWSER' };
+  const chromium = findPlaywright();
+  if (!chromium) return { skip: 'playwright-core not resolvable' };
+  const { EXTRACT } = await lib('textview.mjs');
+
+  let browser = null, lastErr = null;
+  for (const exe of process.env.PEEK_BROWSER ? exes.slice(0, 1) : exes) {
+    try {
+      browser = await chromium.launch({
+        headless: true, executablePath: exe, env: REAL_ENV, args: ['--no-sandbox', '--disable-dev-shm-usage'],
+      });
+      break;
+    } catch (e) { lastErr = e; }
+  }
+  if (!browser) {
+    if (process.env.PEEK_BROWSER) throw lastErr;
+    return { skip: 'no browser could be launched: ' + String(lastErr?.message || lastErr).split('\n')[0] };
+  }
+  try {
+    const page = await (await browser.newContext({ viewport: { width: 800, height: 600 } })).newPage();
+    await page.setContent('<h1>Hi</h1><p>para</p><a href="#x">link</a><button>Go</button><input placeholder="name">');
+    const result = await page.evaluate(EXTRACT);
+    const text = (b) => b.parts.map(p => p.text).join('');
+    assert(result.blocks.some(b => b.kind === 'h1' && text(b) === 'Hi'), 'no h1 block "Hi": ' + JSON.stringify(result.blocks));
+    const parts = result.blocks.flatMap(b => b.parts);
+    assert(parts.some(p => p.role === 'link' && p.id), 'no link part with id');
+    assert(parts.some(p => p.role === 'button'), 'no button part');
+    assert(parts.some(p => p.role === 'input'), 'no input part');
+    assert(await page.evaluate(() => document.querySelector('[data-peek-id]') !== null), 'no data-peek-id in DOM');
   } finally {
     await browser.close().catch(() => {});
   }

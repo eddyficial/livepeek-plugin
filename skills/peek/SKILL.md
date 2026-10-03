@@ -166,10 +166,12 @@ The renderer is probed at startup and the footer names which one is active.
   coarse. Kitty, Ghostty, WezTerm, Windows Terminal 1.22+ and xterm do better.
 - **Blank page** — the server is up but serving nothing useful. For Expo it's
   usually the missing web deps above. Check the URL directly first.
-- **Black image area but the footer says `live`, in Zellij on Windows** —
-  Zellij there draws no graphics. peek now detects this and uses half-blocks
-  with a footer note. For a sharp picture tell the user to run peek from a
-  Windows Terminal pane instead of inside Zellij.
+- **The pane shows the page as text, footer says `text`** — the host draws
+  no graphics (Zellij on Windows does this), so peek renders the DOM as
+  readable text: headings, paragraphs, links, buttons, inputs. Clicks and
+  scrolling still work; `--snapshot` still writes the real pixels. This is
+  expected there. For a sharp picture, run peek from a Windows Terminal pane
+  instead of inside Zellij.
 - **Nothing renders under tmux** — tmux needs `set -g allow-passthrough on`
   for graphics sequences to reach the terminal.
 - **Tiny or cropped** — the pane is too narrow for the viewport. Suggest
@@ -194,7 +196,7 @@ Focus the pane first (`alt`+arrow in most terminals, `prefix`+arrow in tmux).
 | `+` `-` `0` | zoom in / out / reset (CSS zoom, viewport unchanged) |
 | `c` | copy the current frame to the system clipboard |
 | `.` | pause refreshing |
-| `b` | cycle renderer |
+| `b` | cycle renderer: kitty, sixel, text, half-blocks |
 | `q` | quit and close the pane |
 
 Inside the preset picker: `↑`/`↓` move, `PageUp`/`PageDown` jump, `Home`/`End`
