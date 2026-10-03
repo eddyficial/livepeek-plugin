@@ -116,6 +116,34 @@ Real pixels, not ASCII art. The renderer is probed at startup, never assumed:
 The footer names the active renderer. Press `b` to cycle if the probe got it
 wrong.
 
+## Supported platforms
+
+What peek needs: Node 18 or newer, Chrome or Edge installed, and a terminal
+that can split. Whether you get a picture or text depends on the terminal.
+"Verified" means driven by hand on that setup for the current release;
+"expected" means the code path is the same but nobody has run it there yet.
+
+| terminal | OS | you get | status |
+|---|---|---|---|
+| Windows Terminal 1.22+ | Windows | picture (sixel) | verified |
+| VS Code terminal, `terminal.integrated.enableImages` on | Windows | picture (sixel or kitty) | verified |
+| VS Code terminal, setting off | any | text | verified on Windows |
+| Zellij | Windows | text only. Zellij on Windows draws no images | verified |
+| Zellij | macOS, Linux | picture (sixel) | expected |
+| tmux 3.4+ with `allow-passthrough on` | macOS, Linux, Windows | picture | expected |
+| Kitty, Ghostty | macOS, Linux | picture (kitty graphics) | expected |
+| WezTerm | macOS, Linux, Windows | picture (sixel) | expected |
+| macOS Terminal.app, plain PowerShell or cmd window | | no split and no graphics: use `--here` inside tmux, or get text | expected |
+
+In VS Code the terminal has to be split by hand; see below. Every row above
+also gets live reload, mouse clicks, scrolling, typing and `--snapshot`, which
+always captures the real page at full resolution whatever the terminal shows.
+
+The automated test suite (image encoders, static server, markdown and text
+renderers, launcher detection, a headless browser round trip) runs on Windows
+and Ubuntu in GitHub Actions on every push. `peek --doctor` tells you which
+row you are in before you open a pane.
+
 ## Terminals
 
 The pane is created by whichever multiplexer is hosting you:
