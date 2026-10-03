@@ -80,7 +80,7 @@ building — a phone frame around it would misrepresent it.
 You do not have to be in a Claude session. A one-word `peek` command works
 from any shell once you copy a wrapper from the plugin's `bin/` folder onto
 your PATH: `bin/peek.cmd` for PowerShell, `bin/peek` for Bash and the shells
-inside tmux and Zellij. On Windows, dropping both into `%APPDATA%\npm` covers
+inside tmux and Zellij. On Windows, dropping both into the folder `npm config get prefix` prints covers
 every shell at once. After that, `peek` in a project folder opens the pane
 and `peek --quit` closes it. The README has the exact copy commands.
 
@@ -222,7 +222,7 @@ node "$CLAUDE_PLUGIN_ROOT/scripts/tui.mjs" --list
 
 ```
 /peek --preset laptop            a different viewport
-/peek --url http://host:1234     skip detection, point at a server
+/peek --url http://localhost:1234     skip detection, point at a server
 /peek --port 3000                non-default dev server port
 /peek --size 0.4                 wider pane
 /peek --horizontal               split below instead of beside

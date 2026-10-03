@@ -59,12 +59,14 @@ stale after an update:
 - `bin/peek` for Bash, Zsh and the shell inside tmux or Zellij
 - `bin/peek.cmd` for PowerShell and cmd on Windows
 
-Copy whichever you need onto your PATH. On Windows the npm global folder is
-already there for every shell:
+Copy whichever you need into a folder that is on your PATH. On Windows, the
+folder `npm` already put on your PATH works for every shell at once; run
+`npm config get prefix` to see where it is, then copy both files into it:
 
 ```
-copy bin\peek.cmd %APPDATA%\npm
-copy bin\peek     %APPDATA%\npm```
+copy bin\peek.cmd <that folder>
+copy bin\peek     <that folder>
+```
 
 On macOS and Linux, `/usr/local/bin` or `~/.local/bin`:
 
@@ -207,7 +209,7 @@ analogue-feeling input will be approximate.
 
 ```
 /peek --preset laptop          a different viewport
-/peek --url http://host:1234   skip detection, point at a server
+/peek --url http://localhost:1234   skip detection, point at a server
 /peek --port 3000              non-default dev server port
 /peek --size 0.4               wider pane
 /peek --horizontal             split below instead of beside

@@ -35,7 +35,7 @@ function checkNode() {
   const major = parseInt(process.versions.node.split('.')[0], 10);
   if (major >= 18) return report('ok', 'node', `v${process.versions.node}`);
   report('FAIL', 'node', `v${process.versions.node} is too old (need 18 or newer)`,
-    'install a current Node.js from https://nodejs.org');
+    'install a current Node.js (18 or newer) from the Node.js download page');
 }
 
 // -------------------------------------------------------------- browser ----
@@ -45,9 +45,9 @@ function findSystemBrowser() {
 
   if (process.platform === 'win32') {
     const roots = [
-      process.env['ProgramFiles'],
-      process.env['ProgramFiles(x86)'],
-      process.env['LOCALAPPDATA'],
+      process.env.ProgramFiles,
+      'C:/Program Files (x86)',
+      process.env.LOCALAPPDATA,
     ].filter(Boolean);
     for (const r of roots) {
       candidates.push(path.join(r, 'Google/Chrome/Application/chrome.exe'));
