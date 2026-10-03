@@ -123,27 +123,7 @@ await test('projects remember()/list() round-trip in a temp HOME', async () => {
   assert(fs.existsSync(path.join(HOME, '.peek', 'projects.json')), 'file not written under temp HOME');
 });
 
-await test('serveStatic serves index.html with live-reload script', async () => {
-  const dir = tmpdir('serve-html');
-  fs.writeFileSync(path.join(dir, 'index.html'), '<!doctype html><title>Hello Peek</title><body><h1>hi</h1></body>');
-  const url = await serve(dir);
-  const res = await fetch(url);
-  eq(res.status, 200, 'status');
-  const text = await res.text();
-  assert(text.includes('<h1>hi</h1>'), 'index.html content missing');
-  assert(text.includes('/__peek/stamp'), 'live-reload script missing');
-});
-
-await test('serveStatic renders README.md with an h1 and live reload', async () => {
-  const dir = tmpdir('serve-md');
-  fs.writeFileSync(path.join(dir, 'README.md'), '# Big Title\n\nsome text\n');
-  const url = await serve(dir, { file: 'README.md' });
-  const text = await (await fetch(url)).text();
-  assert(/<h1[^>]*>\s*Big Title\s*<\/h1>/.test(text), 'no rendered h1: ' + text.slice(0, 300));
-  assert(text.includes('/__peek/stamp'), 'live-reload script missing');
-});
-
-// Raw request: fetch() would collapse "/%2e%2e/" before it reached the server.
+// Raw request. A high-level client would collapse "/%2e%2e/" before it reached the server.
 const httpGetRaw = (base, rawPath) => new Promise((resolve, reject) => {
   const u = new URL(base);
   http.get({ host: u.hostname, port: u.port, path: rawPath }, (res) => {
@@ -152,6 +132,26 @@ const httpGetRaw = (base, rawPath) => new Promise((resolve, reject) => {
     res.on('data', (c) => { body += c; });
     res.on('end', () => resolve({ status: res.statusCode, body }));
   }).on('error', reject);
+});
+
+await test('serveStatic serves index.html with live-reload script', async () => {
+  const dir = tmpdir('serve-html');
+  fs.writeFileSync(path.join(dir, 'index.html'), '<!doctype html><title>Hello Peek</title><body><h1>hi</h1></body>');
+  const url = await serve(dir);
+  const res = await httpGetRaw(url, '/');
+  eq(res.status, 200, 'status');
+  const text = res.body;
+  assert(text.includes('<h1>hi</h1>'), 'index.html content missing');
+  assert(text.includes('/__peek/stamp'), 'live-reload script missing');
+});
+
+await test('serveStatic renders README.md with an h1 and live reload', async () => {
+  const dir = tmpdir('serve-md');
+  fs.writeFileSync(path.join(dir, 'README.md'), '# Big Title\n\nsome text\n');
+  const url = await serve(dir, { file: 'README.md' });
+  const text = (await httpGetRaw(url, '/')).body;
+  assert(/<h1[^>]*>\s*Big Title\s*<\/h1>/.test(text), 'no rendered h1: ' + text.slice(0, 300));
+  assert(text.includes('/__peek/stamp'), 'live-reload script missing');
 });
 
 await test('serveStatic refuses path traversal, including sibling dirs sharing the root prefix', async () => {

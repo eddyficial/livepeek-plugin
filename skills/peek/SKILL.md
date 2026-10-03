@@ -1,7 +1,7 @@
 ---
 name: peek
-description: Open a live view of whatever the user is building - a website, a game, a phone app, a document, a mockup - in a split terminal pane, and look at it yourself after making changes. Use when the user says "/peek", "show me", "open the preview", "let me see it", "start the emulator", "view the site", "preview this file", or asks to watch what they are building while they edit. Also use after editing UI, game or document files to verify the change visually, and for "the preview is blank / looks wrong".
-version: 0.3.0
+description: Open a live view of whatever the user is building - a website, a game, a phone app, a document, a mockup - in a split terminal pane, and look at it yourself after making changes. Use when the user says "/livepeek:peek", "show me", "open the preview", "let me see it", "start the emulator", "view the site", "preview this file", or asks to watch what they are building while they edit. Also use after editing UI, game or document files to verify the change visually, and for "the preview is blank / looks wrong".
+version: 0.4.0
 ---
 
 # peek: a live viewing portal in the terminal
@@ -16,14 +16,14 @@ apps through their web build) and for things with no server at all: a folder
 with an `index.html`, a single `.html` mockup, or a markdown document. Those
 are served by peek itself, with live reload.
 
-Nothing needs installing in the user's project. On first run peek fetches its
-own browser driver (~3 MB, no browser download) into the plugin directory and
-drives the Chrome or Edge already on the machine.
+Nothing needs installing in the user's project. peek drives the Chrome or
+Edge already on the machine through `playwright-core`, which the user installs
+once (`npm install -g playwright-core@1.63.0`). peek downloads nothing itself.
 
 ## Launching it
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/pane.mjs"
+peek
 ```
 
 Self-contained: it finds the project root, works out which framework it is,
@@ -59,7 +59,7 @@ can. After you edit a screen, a level, a page or a document, do not ask the
 user whether it looks right - check:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/pane.mjs" --snapshot .peek/snapshot.png
+peek --snapshot .peek/snapshot.png
 ```
 
 then read the PNG with the Read tool. The path is relative to the project and
@@ -72,8 +72,8 @@ moment to pick the change up.
 When pixels are not enough, ask the page directly:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/pane.mjs" --eval 'document.querySelector("h1").textContent'
-node "${CLAUDE_PLUGIN_ROOT}/scripts/pane.mjs" --eval '[innerWidth, innerHeight]'
+peek --eval 'document.querySelector("h1").textContent'
+peek --eval '[innerWidth, innerHeight]'
 ```
 
 Both need a pane to be open. If the user said "change X" and X is visible in
@@ -123,11 +123,11 @@ tells the user to start building. The pane watches that folder and switches to
 an `index.html`, `.html` or `.md` the moment one appears, with no relaunch. If the user
 meant a specific file or server, pass `--file` or `--url`; do not guess a port.
 
-**"Could not fetch playwright-core automatically"** (shown inside the pane):
-the one-time driver download failed, usually no network or an npm proxy. The
-fallback is `npm i -D playwright-core` in the user's project, which peek also
-finds. Full `playwright` plus `npx playwright install chromium` works too and
-is preferred when present.
+**"The browser driver is not installed"** (shown inside the pane, or by
+`peek --doctor`): peek downloads nothing itself. Tell the user to run
+`npm install -g playwright-core@1.63.0` once (or `npm i -D` the same package
+in the project), then launch again. Ask before running it for them; it is
+an install on their machine.
 
 A pane that fails to start shows the reason and waits for a keypress before
 closing, so the user can read it. Ask them what it said.

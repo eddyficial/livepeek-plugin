@@ -18,7 +18,7 @@ No browser window. No emulator. Nothing to alt-tab to.
 ![peek showing a landing page at desktop, laptop and phone sizes, then a markdown spec, then a live edit landing](docs/demo.gif)
 
 ```
-/peek
+/livepeek:peek
 ```
 
 That's the whole interface. It works out what your project is, starts the dev
@@ -33,29 +33,36 @@ run and the handful of things that can go wrong.
 
 ## Before you start
 
-Three things need to be on the machine already. Everything else peek fetches itself.
+Four things need to be on the machine. peek itself downloads nothing, ever.
 
 - **Node.js** 18 or newer. If Claude Code runs, you have it.
 - **Chrome or Edge.** Peek drives the browser you already have instead of downloading one. Windows ships with Edge, so Windows users are covered out of the box.
 - **A terminal that can split and draw graphics:** Windows Terminal 1.22+ (the Windows 11 default), or tmux, Zellij, Kitty or WezTerm on macOS and Linux. The stock macOS Terminal.app does not qualify.
+- **The browser driver**, one npm package, installed once by you:
 
-The first launch downloads a 3 MB browser driver with `npm`, so it needs a network connection once. If you point peek at a Vite, Next or Expo project, that project's own `npm install` must already have been run.
+  ```
+  npm install -g playwright-core@1.63.0
+  ```
+
+  peek finds it from the global install, from the project's own `node_modules`, or from a full `playwright` install. `peek --doctor` tells you if it is missing.
+
+If you point peek at a Vite, Next or Expo project, that project's own `npm install` must already have been run.
 
 ## Install
 
 ```
 /plugin marketplace add eddyficial/peek
-/plugin install peek@peek
+/plugin install livepeek@peek
 ```
 
-Nothing to add to your project. On first run `peek` fetches its own browser
-driver (`playwright-core`, ~3 MB, no browser download) into the plugin folder
-and drives the Chrome or Edge already on your machine, headless. If a project
-has full `playwright` with a downloaded Chromium, that is used instead.
+Nothing to add to your project. `peek` drives the Chrome or Edge already on
+your machine, headless, through the `playwright-core` driver you installed
+once (see Before you start). If a project has full `playwright` with a
+downloaded Chromium, that is used instead.
 
 ## Open it from any shell
 
-`/peek` inside Claude Code is one way in. The other is a plain `peek` command
+`/livepeek:peek` inside Claude Code is one way in. The other is a plain `peek` command
 in whatever shell you are in, no Claude session needed. Two tiny wrappers in
 [`bin/`](bin/) find the newest installed copy of the plugin, so they never go
 stale after an update:
@@ -170,7 +177,7 @@ Under tmux, graphics need passthrough enabled:
 set -g allow-passthrough on
 ```
 
-**VS Code's terminal works, with one manual step.** Nothing outside VS Code can split its terminal, so: split it yourself (the split icon, or Ctrl+Shift+5 / Cmd+\ on a Mac), and in the new half run `peek --here`. Live reload, clicks and keys all work. For pictures rather than text, turn on the setting `terminal.integrated.enableImages` and reload the window (Developer: Reload Window); a new terminal alone is not enough. Tested on VS Code 1.140: both sixel and kitty graphics render there. Running `tmux` inside the VS Code terminal also works, and then `/peek` splits for you.
+**VS Code's terminal works, with one manual step.** Nothing outside VS Code can split its terminal, so: split it yourself (the split icon, or Ctrl+Shift+5 / Cmd+\ on a Mac), and in the new half run `peek --here`. Live reload, clicks and keys all work. For pictures rather than text, turn on the setting `terminal.integrated.enableImages` and reload the window (Developer: Reload Window); a new terminal alone is not enough. Tested on VS Code 1.140: both sixel and kitty graphics render there. Running `tmux` inside the VS Code terminal also works, and then `/livepeek:peek` splits for you.
 
 **No graphics? You get the page as text.** Some hosts cannot draw images at all (Zellij on Windows is one; it passes the terminal's sixel reply through but renders nothing). There peek lays the page out as text instead: headings, paragraphs, lists, links and buttons, wrapped to the pane. Scrolling scrolls, clicking a link or button clicks it, `i` types into a focused field. It is a reader, not a picture, so layout and colour are gone, but every word is legible. `b` cycles kitty, sixel, text and half-blocks if the automatic choice is wrong. For a sharp picture on Windows, run peek from a Windows Terminal pane directly.
 
@@ -238,21 +245,21 @@ analogue-feeling input will be approximate.
 ## Options
 
 ```
-/peek --preset laptop          a different viewport
-/peek --url http://localhost:1234   skip detection, point at a server
-/peek --port 3000              non-default dev server port
-/peek --size 0.4               wider pane
-/peek --horizontal             split below instead of beside
-/peek --no-serve               a server is already running
-/peek --file docs/spec.md      show one file (markdown or html)
-/peek --snapshot out.png       write what the pane shows to a PNG
-/peek --eval 'innerWidth'      run a snippet in the shown page
-/peek --here                   run in this pane, don't split
-/peek --new                    force a second pane instead of reusing
-/peek --quit                   close the open pane cleanly
-/peek --compare desktop,iphone-15-pro   two panes side by side, one per preset (q closes each)
-/peek --doctor                 check Node, browser, driver, terminal and graphics, say what will work
-/peek --dry-run                print what it would do and stop
+/livepeek:peek --preset laptop          a different viewport
+/livepeek:peek --url http://localhost:1234   skip detection, point at a server
+/livepeek:peek --port 3000              non-default dev server port
+/livepeek:peek --size 0.4               wider pane
+/livepeek:peek --horizontal             split below instead of beside
+/livepeek:peek --no-serve               a server is already running
+/livepeek:peek --file docs/spec.md      show one file (markdown or html)
+/livepeek:peek --snapshot out.png       write what the pane shows to a PNG
+/livepeek:peek --eval 'innerWidth'      run a snippet in the shown page
+/livepeek:peek --here                   run in this pane, don't split
+/livepeek:peek --new                    force a second pane instead of reusing
+/livepeek:peek --quit                   close the open pane cleanly
+/livepeek:peek --compare desktop,iphone-15-pro   two panes side by side, one per preset (q closes each)
+/livepeek:peek --doctor                 check Node, browser, driver, terminal and graphics, say what will work
+/livepeek:peek --dry-run                print what it would do and stop
 ```
 
 ## Claude can see it
@@ -279,7 +286,7 @@ It drives a real browser, so it shows what a browser shows, and only that.
 
 ## When something is wrong
 
-`peek --doctor` (or `/peek --doctor`) checks everything peek needs and says which renderer your terminal will get. Run it first if the pane looks like coloured noise or never opens.
+`peek --doctor` (or `/livepeek:peek --doctor`) checks everything peek needs and says which renderer your terminal will get. Run it first if the pane looks like coloured noise or never opens.
 
 The pane also tells you when the page is unwell: a red `2 errors` in the footer means the page threw or logged `console.error` (press `e` to read them), and `page not responding` means the browser stopped answering, which usually means a tight loop in your code.
 
@@ -295,16 +302,16 @@ node -e "try{const s=require(require('os').homedir()+'/.peek/session.json');proc
 
 `node test/run.mjs` runs the unit, launcher and browser tests. It needs no terminal multiplexer; the browser tests use whatever Chrome or Edge it finds and skip if there is none. The same suite runs on Windows and Linux in GitHub Actions on every push.
 
-## What peek runs and fetches
+## What peek runs
 
 Everything peek does, so you can check it before installing:
 
 - **Starts a headless Chrome or Edge** that is already installed on your machine, and screenshots it. No browser is downloaded.
-- **Downloads one package, once.** On first launch it runs `npm install playwright-core@1.63.0` into the plugin's own folder (about 3 MB, pinned to that exact version). Nothing is installed into your project.
+- **Downloads nothing.** The browser driver (`playwright-core`, pinned to 1.63.0) is something you install once with npm; peek only looks for it and tells you the command if it is missing.
 - **Serves your files on localhost.** For a plain folder, `.html` or `.md` file it starts a small web server on a random local port. It does not listen on other network interfaces.
 - **Starts your dev server, only if you ask.** Opening a Vite, Next, Expo or similar project runs that project's own `npm run` script, and picking a stopped project in the `p` list does the same.
 - **Writes a little local state** to `~/.peek/`: which pane is open, and the folders you have previewed (`projects.json`). Delete the folder to clear it.
-- **Sends nothing anywhere.** No telemetry, no analytics, no account. The only outbound request peek makes itself is the one-time npm download above. The pages you preview make whatever requests they normally would.
+- **Sends nothing anywhere.** No telemetry, no analytics, no account, no outbound requests of its own. The pages you preview make whatever requests they normally would.
 - **Has no hooks and no MCP server.** It adds one skill and one optional `peek` shell command.
 - **Clipboard, only when you press `c`.** Copying a frame uses PowerShell on Windows, `osascript` on macOS, and `wl-copy` or `xclip` on Linux. Nothing is read from the clipboard.
 

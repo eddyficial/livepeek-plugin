@@ -35,17 +35,22 @@ sequences without it.)
 No multiplexer at all? `peek` still works, it just runs in your current pane
 instead of splitting; see `--here` below.
 
-That's it. The browser engine takes care of itself: on first run `peek`
-fetches a ~3 MB driver into its own folder (no browser download) and uses the
-Chrome or Edge already on your machine, headless. You'll see a one-line status
-in the pane while it does. You won't see a browser window.
+Then one package, installed once and never again:
+
+```bash
+npm install -g playwright-core@1.63.0
+```
+
+That is the driver `peek` uses to steer the Chrome or Edge already on your
+machine, headless. `peek` downloads nothing itself. You won't see a browser
+window.
 
 ## Your first run
 
 From inside your project, in Claude Code:
 
 ```
-/peek
+/livepeek:peek
 ```
 
 That's it. `peek` will:
@@ -86,7 +91,7 @@ and `peek --quit` closes it. The README has the exact copy commands.
 
 ## In VS Code
 
-The VS Code terminal cannot be split from the outside, so `/peek` there
+The VS Code terminal cannot be split from the outside, so `/livepeek:peek` there
 prints instructions instead of a pane. Follow them: split the terminal by
 hand (Ctrl+Shift+5, or Cmd+\ on a Mac) and run `peek --here` in the new
 half. To see the real picture instead of text, enable the setting
@@ -169,24 +174,26 @@ set -g allow-passthrough on
 `tmux` and run Claude Code inside it, or run it in your current pane:
 
 ```
-/peek --here
+/livepeek:peek --here
 ```
 
-**"Could not fetch playwright-core automatically."** The one-time driver
-download failed, usually no network. Install it by hand in your project and
-`peek` will find it:
+**"The browser driver is not installed."** peek downloads nothing itself;
+the driver is one npm package you install once. Either globally:
 
 ```bash
-npm i -D playwright-core
+npm install -g playwright-core@1.63.0
 ```
+
+or in the project (`npm i -D playwright-core@1.63.0`). `peek --doctor` confirms
+it is found.
 
 **You see a "peek is ready" welcome page.** The folder has no framework it
 recognises and no `index.html`, `.html` or `.md` yet. Start building, or name
 the thing you mean:
 
 ```
-/peek --file docs/spec.md
-/peek --url http://localhost:3000
+/livepeek:peek --file docs/spec.md
+/livepeek:peek --url http://localhost:3000
 ```
 
 **The page is blank.** Your dev server is up but serving nothing useful. Open
@@ -197,8 +204,8 @@ web-build dependencies; `peek` will tell you and offer to install them.
 pane or a smaller viewport:
 
 ```
-/peek --size 0.5
-/peek --preset laptop
+/livepeek:peek --size 0.5
+/livepeek:peek --preset laptop
 ```
 
 ## What it recognises automatically
@@ -218,17 +225,17 @@ to filter the list.
 ## Options
 
 ```
-/peek --preset laptop            a different viewport
-/peek --url http://localhost:1234     skip detection, point at a server
-/peek --port 3000                non-default dev server port
-/peek --size 0.4                 wider pane
-/peek --horizontal               split below instead of beside
-/peek --no-serve                 your server is already running
-/peek --file docs/spec.md        show one file (markdown or html)
-/peek --here                     run in this pane, don't split
-/peek --new                      force a second pane instead of reusing
-/peek --quit                     close the open pane cleanly
-/peek --dry-run                  show what it would do, then stop
+/livepeek:peek --preset laptop            a different viewport
+/livepeek:peek --url http://localhost:1234     skip detection, point at a server
+/livepeek:peek --port 3000                non-default dev server port
+/livepeek:peek --size 0.4                 wider pane
+/livepeek:peek --horizontal               split below instead of beside
+/livepeek:peek --no-serve                 your server is already running
+/livepeek:peek --file docs/spec.md        show one file (markdown or html)
+/livepeek:peek --here                     run in this pane, don't split
+/livepeek:peek --new                      force a second pane instead of reusing
+/livepeek:peek --quit                     close the open pane cleanly
+/livepeek:peek --dry-run                  show what it would do, then stop
 ```
 
 ## When peek is the wrong tool
@@ -252,7 +259,7 @@ It drives a real browser, so it shows what a browser shows, and nothing else.
 ## Letting Claude check its own work
 
 Tell Claude "change the header to orange" and it can edit the file, then run
-`/peek --snapshot` and look at the result before telling you it's done. The
+`/livepeek:peek --snapshot` and look at the result before telling you it's done. The
 plugin's skill already instructs it to. If you want to see what it saw, the
 PNG it wrote is the page at full size.
 

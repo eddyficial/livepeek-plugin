@@ -75,7 +75,7 @@ function checkBrowser() {
 }
 
 // --------------------------------------------------------------- driver ----
-// The copy peek fetches for itself lives next to this script.
+// A copy installed next to this script is honoured, as is a global or project one.
 const BUNDLED_DRIVER = path.join(__dirname, 'node_modules', 'playwright-core');
 
 function checkDriver() {
@@ -87,7 +87,7 @@ function checkDriver() {
     try { where = createRequire(process.cwd() + path.sep).resolve('playwright-core/package.json'); }
     catch { /* not resolvable from here */ }
   }
-  if (!where) return report('ok', 'driver', 'will be fetched on first run (needs network once)');
+  if (!where) return report('FAIL', 'driver', 'not installed. Run: npm install -g playwright-core@1.63.0');
 
   let version = 'unknown version';
   try { version = JSON.parse(fs.readFileSync(where, 'utf8')).version; } catch { /* keep default */ }
@@ -156,7 +156,7 @@ function checkNpm() {
   // with the driver already in place, npm only matters for starting dev servers
   const haveDriver = fs.existsSync(BUNDLED_DRIVER);
   report(haveDriver ? 'warn' : 'FAIL', 'npm', 'not found on PATH',
-    'install Node.js with npm included; peek needs it to fetch the driver and start dev servers');
+    'install Node.js with npm included; peek needs it to start dev servers');
 }
 
 // ----------------------------------------------------------------- home ----

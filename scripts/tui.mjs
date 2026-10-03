@@ -176,26 +176,13 @@ function resolveChromium() {
  * user sees a one-line status rather than a stack trace, and a document
  * folder with no package.json works exactly like a Vite project does.
  */
-// Pinned: an unpinned install would run whatever version is newest on the day
-// someone first launches peek.
-async function installDriver() {
-  statusMsg = 'first run: fetching browser driver (~3 MB, once)';
-  drawFooter(lastLayout || layout());
-  const { spawnSync } = await import('node:child_process');
-  // shell: true joins argv into one command line unquoted, so a plugin folder
-  // with a space in it would split in two. Double quotes work in cmd and sh.
-  // Plain quotes rather than JSON.stringify, which would double every
-  // backslash in a Windows path.
-  const r = spawnSync('npm', ['install', '--prefix', '"' + __dirname + '"', '--no-fund', '--no-audit', '--no-save',
-    '--silent', 'playwright-core@1.63.0'], { cwd: __dirname, shell: true, windowsHide: true, encoding: 'utf8' });
-  if (r.status !== 0) {
-    throw new Error(
-      'Could not fetch playwright-core automatically.\n' +
-      (r.stderr || '').trim().split('\n').slice(-3).join('\n') +
-      '\n\nInstall it by hand in your project:\n  npm i -D playwright-core'
-    );
-  }
-}
+// peek downloads nothing at run time. The browser driver is one npm package,
+// installed once by the user; the message says exactly which command.
+export const DRIVER_HINT =
+  'The browser driver is not installed. Install it once, then run peek again:\n\n' +
+  '  npm install -g playwright-core@1.63.0\n\n' +
+  'Or per project:  npm i -D playwright-core@1.63.0\n' +
+  '(peek --doctor checks for it.)';
 
 /**
  * A Chrome or Edge already on this machine, used as a fallback when
@@ -1504,12 +1491,8 @@ async function main() {
   lastLayout = layout();
   drawHeader(lastLayout);
 
-  let chromium = resolveChromium();
-  if (!chromium) {
-    await installDriver();
-    chromium = resolveChromium();
-    if (!chromium) throw new Error('playwright-core was installed but could not be loaded from ' + __dirname);
-  }
+  const chromium = resolveChromium();
+  if (!chromium) throw new Error(DRIVER_HINT);
 
   statusMsg = 'launching browser';
   drawFooter(lastLayout);
