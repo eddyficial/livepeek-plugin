@@ -198,7 +198,13 @@ const shellQuote = (parts) => parts.map(p => "'" + String(p).replace(/'/g, "'\\'
  * innermost owns the pane the user is looking at, so it has to win.
  */
 function detectHost() {
-  if (process.env.TMUX) return 'tmux';
+  // A VS Code terminal inherits the environment VS Code was launched from,
+  // so ZELLIJ or WT_SESSION may be set while no such pane is anywhere near
+  // this terminal. TERM_PROGRAM is set by the innermost program: VS Code
+  // says vscode, and tmux overrides it with tmux when it is really inside.
+  const vscode = (process.env.TERM_PROGRAM || '').toLowerCase() === 'vscode';
+  if (process.env.TMUX && !vscode) return 'tmux';
+  if (vscode) return null;
   if (process.env.ZELLIJ) return 'zellij';
   if (process.env.KITTY_LISTEN_ON) return 'kitty';
   if (process.env.WEZTERM_PANE) return 'wezterm';

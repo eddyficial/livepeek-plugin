@@ -265,6 +265,7 @@ let colorScheme = null;    // null = page default, 'dark' | 'light' when forced
 let zoom = 1;
 let textLines = [];        // text renderer: laid-out lines of the current page
 let textScroll = 0;        // first line shown
+let lastTextClick = { at: 0, col: -1, row: -1 };
 let lastTextKey = '';      // JSON of the last extraction, for change detection
 let lastStatus = null;
 let paused = false;
@@ -1031,6 +1032,11 @@ async function handleMouse(code, col, row, press) {
     if (headerHit && row === headerHit.row && col >= headerHit.col0 && col <= headerHit.col1) { openMenu(); return; }
     const hit = textHit(col, row);
     if (!hit) return;
+    // VS Code's terminal has been seen delivering one click as two presses
+    // on the same cell a few ms apart; no human clicks twice in 120 ms
+    const nowT = Date.now();
+    if (nowT - lastTextClick.at < 120 && lastTextClick.col === col && lastTextClick.row === row) return;
+    lastTextClick = { at: nowT, col, row };
     try {
       await page.evaluate((id) => {
         const el = document.querySelector('[data-peek-id="' + id + '"]');
@@ -1458,6 +1464,7 @@ async function main() {
   startBeat = setInterval(beat, 2000);
 
   out(`${ESC}[?1049h${ESC}[?25l`);          // alt screen, hide cursor
+  out(`${ESC}]0;peek${String.fromCharCode(7)}`);   // tab title: VS Code otherwise names it after the browser child
   if (process.stdin.isTTY) process.stdin.setRawMode(true);
   process.stdin.resume();
 

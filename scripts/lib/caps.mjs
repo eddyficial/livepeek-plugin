@@ -107,14 +107,18 @@ function applyEnvHints(caps) {
   if (process.env.GHOSTTY_RESOURCES_DIR || prog === 'ghostty') caps.kitty = true;
   if (process.env.WEZTERM_PANE) caps.sixel = true;
   if (prog === 'iterm.app' || prog === 'wezterm') caps.sixel = true;
-  if (process.env.WT_SESSION) caps.sixel = true;      // Windows Terminal >= 1.22
+  // VS Code's terminal inherits whatever environment VS Code was launched
+  // from, so ZELLIJ or WT_SESSION may be set with no such terminal in sight.
+  // In VS Code only the probe replies count (it answers both honestly).
+  const inVsCode = prog === 'vscode';
+  if (process.env.WT_SESSION && !inVsCode) caps.sixel = true;      // Windows Terminal >= 1.22
   if (term.includes('mlterm') || term.includes('foot')) caps.sixel = true;
 
   // Zellij on Windows passes the terminal's "I can do sixel" reply through
   // but draws neither sixel nor kitty graphics itself: the pane stays black
   // with a footer saying "live". Verified on Zellij 0.44 over Windows
   // Terminal. Half-blocks are the only thing that shows there.
-  if (process.env.ZELLIJ !== undefined && process.platform === 'win32') {
+  if (process.env.ZELLIJ !== undefined && process.platform === 'win32' && !inVsCode) {
     caps.sixel = false;
     caps.kitty = false;
     caps.note = 'zellij on windows shows no graphics: showing the page as text';

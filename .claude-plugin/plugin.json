@@ -1,6 +1,6 @@
 {
   "name": "peek",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "description": "A live viewing portal in your terminal. Whatever you are building - a website, a game, a phone app, a document - renders in a split pane as you edit it, and Claude can snapshot the pane to check its own changes. Clickable, scrollable, typeable. No browser window, no emulator, nothing to install in your project.",
   "author": {
     "name": "eddyficial",
