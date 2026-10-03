@@ -122,11 +122,11 @@ The pane is created by whichever multiplexer is hosting you:
 
 | host | detected via |
 |---|---|
-| tmux | `$TMUX` |
-| Zellij | `$ZELLIJ` |
-| Kitty | `$KITTY_LISTEN_ON` |
-| WezTerm | `$WEZTERM_PANE` |
-| Windows Terminal | `$WT_SESSION` |
+| tmux | the `TMUX` variable |
+| Zellij | the `ZELLIJ` variable |
+| Kitty | the `KITTY_LISTEN_ON` variable |
+| WezTerm | the `WEZTERM_PANE` variable |
+| Windows Terminal | the `WT_SESSION` variable |
 
 tmux works on macOS, Linux and Windows, so it's the universal fallback — start
 `tmux` and you have a pane anywhere. With no multiplexer at all, `--here` runs
