@@ -120,6 +120,13 @@ function applyEnvHints(caps) {
     caps.note = 'zellij on windows shows no graphics: showing the page as text';
   }
 
+  // VS Code's terminal draws sixel only with terminal.integrated.enableImages
+  // on; its DA1 reply says so honestly, so the probe is right either way.
+  // The note tells the user what to flip rather than leaving them in text.
+  if (prog === 'vscode' && !caps.sixel && !caps.kitty) {
+    caps.note = 'vs code: enable terminal.integrated.enableImages for pictures; showing text';
+  }
+
   caps.tmux = !!process.env.TMUX;
   return caps;
 }

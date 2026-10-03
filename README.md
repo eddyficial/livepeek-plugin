@@ -138,6 +138,8 @@ Under tmux, graphics need passthrough enabled:
 set -g allow-passthrough on
 ```
 
+**VS Code's terminal works, with one manual step.** Nothing outside VS Code can split its terminal, so: split it yourself (the split icon, or Ctrl+Shift+5 / Cmd+\ on a Mac), and in the new half run `peek --here`. Live reload, clicks and keys all work. For pictures rather than text, turn on the setting `terminal.integrated.enableImages` and restart the terminal. Running `tmux` inside the VS Code terminal also works, and then `/peek` splits for you.
+
 **No graphics? You get the page as text.** Some hosts cannot draw images at all (Zellij on Windows is one; it passes the terminal's sixel reply through but renders nothing). There peek lays the page out as text instead: headings, paragraphs, lists, links and buttons, wrapped to the pane. Scrolling scrolls, clicking a link or button clicks it, `i` types into a focused field. It is a reader, not a picture, so layout and colour are gone, but every word is legible. `b` cycles kitty, sixel, text and half-blocks if the automatic choice is wrong. For a sharp picture on Windows, run peek from a Windows Terminal pane directly.
 
 One pane follows you between terminals too. If you open peek in Windows

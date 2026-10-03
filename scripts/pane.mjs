@@ -378,6 +378,23 @@ async function main() {
   }
 
   const host = detectHost();
+  if (!host && (process.env.TERM_PROGRAM || '').toLowerCase() === 'vscode') {
+    // VS Code's terminal can split, but nothing outside VS Code can ask it
+    // to, so the user does that part and runs the viewer in the new half.
+    die(
+      '\nThis is the VS Code terminal. It can show peek, but it has to be split by hand:\n\n' +
+      '  1. Split the terminal: the split icon in the terminal panel, or Ctrl+Shift+5\n' +
+      '     (Cmd+\\ on a Mac).\n' +
+      '  2. In the new half run:\n' +
+      `       node ${path.join(__dirname, 'pane.mjs')} --here\n` +
+      '     (or just: peek --here, if the peek command is installed)\n\n' +
+      'For pictures instead of text, turn on the VS Code setting\n' +
+      '  terminal.integrated.enableImages\n' +
+      'and restart the terminal. Without it peek shows the page as text.\n\n' +
+      'Or run tmux inside the VS Code terminal and peek splits it for you.\n',
+      3
+    );
+  }
   if (!host) {
     die(
       '\nNo terminal multiplexer detected, so there is no pane to split.\n' +

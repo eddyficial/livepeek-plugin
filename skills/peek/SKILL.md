@@ -137,6 +137,14 @@ closing, so the user can read it. Ask them what it said.
 The script prints the exact install command. Offer to run it, and ask first —
 it modifies their `package.json`.
 
+**`3` in the VS Code terminal** (the message names VS Code). Nothing can
+split that terminal from outside, so tell the user to split it by hand
+(Ctrl+Shift+5, or Cmd+\ on a Mac) and run `peek --here` (or the full
+`node .../pane.mjs --here` the message prints) in the new half. Do not run
+`--here` yourself: it would take over the terminal you are working in. If
+the pane then shows text rather than a picture, the VS Code setting
+`terminal.integrated.enableImages` is off; suggest enabling it.
+
 **`3` — no terminal multiplexer.** There is no pane to split. Supported hosts
 are tmux, Zellij, Kitty, WezTerm and Windows Terminal. Tell the user either to
 start `tmux` (works everywhere) or to use `--here`, which runs in the current

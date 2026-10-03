@@ -84,6 +84,14 @@ inside tmux and Zellij. On Windows, dropping both into `%APPDATA%\npm` covers
 every shell at once. After that, `peek` in a project folder opens the pane
 and `peek --quit` closes it. The README has the exact copy commands.
 
+## In VS Code
+
+The VS Code terminal cannot be split from the outside, so `/peek` there
+prints instructions instead of a pane. Follow them: split the terminal by
+hand (Ctrl+Shift+5, or Cmd+\ on a Mac) and run `peek --here` in the new
+half. To see the real picture instead of text, enable the setting
+`terminal.integrated.enableImages` and restart the terminal.
+
 ## Driving it
 
 The pane needs focus before it receives your keys. In most terminals that's

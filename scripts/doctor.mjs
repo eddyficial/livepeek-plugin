@@ -108,6 +108,10 @@ function detectHost() {
 function checkHost() {
   const host = detectHost();
   if (host) return report('ok', 'multiplexer', host);
+  if ((process.env.TERM_PROGRAM || '').toLowerCase() === 'vscode') {
+    report('warn', 'multiplexer', 'VS Code terminal: split it by hand and run `peek --here` in the new half',
+      'or run tmux inside it; for pictures enable terminal.integrated.enableImages');
+  } else
   report('FAIL', 'multiplexer', 'none detected, so there is no pane to split',
     'start tmux first (works everywhere), or run peek with --here to use this pane');
 }
