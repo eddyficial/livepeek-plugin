@@ -77,10 +77,10 @@ function checkBrowser() {
 
 // --------------------------------------------------------------- driver ----
 // Found the way tui.mjs finds it: project, next to the scripts, or a global
-// npm install, so the two never disagree.
+// npm global folder, so the two never disagree.
 function checkDriver() {
   const where = locateDriver(__dirname);
-  if (!where) return report('FAIL', 'driver', 'not installed. Run: npm install -g playwright-core@1.63.0');
+  if (!where) return report('FAIL', 'driver', 'not installed. Run: npm add --global playwright-core@1.63.0');
 
   let version = 'unknown version';
   try { version = JSON.parse(fs.readFileSync(where, 'utf8')).version; } catch { /* keep default */ }

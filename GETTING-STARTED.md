@@ -38,7 +38,7 @@ instead of splitting; see `--here` below.
 Then one package, installed once and never again:
 
 ```bash
-npm install -g playwright-core@1.63.0
+npm add --global playwright-core@1.63.0
 ```
 
 That is the driver `peek` uses to steer the Chrome or Edge already on your
@@ -181,10 +181,10 @@ set -g allow-passthrough on
 the driver is one npm package you install once. Either globally:
 
 ```bash
-npm install -g playwright-core@1.63.0
+npm add --global playwright-core@1.63.0
 ```
 
-or in the project (`npm i -D playwright-core@1.63.0`). `peek --doctor` confirms
+or in the project (`npm add --save-dev playwright-core@1.63.0`). `peek --doctor` confirms
 it is found.
 
 **You see a "peek is ready" welcome page.** The folder has no framework it
@@ -216,7 +216,7 @@ pane or a smaller viewport:
 | a game | any of those **plus** Phaser, three, Pixi, Babylon, Excalibur, Kaplay, p5, PlayCanvas | 16:9 720p |
 | a phone app | Expo, React Native | iPhone 15 Pro, with a phone body |
 | a document or mockup | `index.html`, any `.html`, any `.md` (no package.json needed) | desktop, or a 900×1200 page for markdown |
-| anything else | nothing detected | pass `--url` or `--file` |
+| anything else | nothing detected | give it `--url` or `--file` |
 
 33 viewports ship with it: 21 real devices, 6 web breakpoints, 5 game aspect
 ratios, 2 document pages. Press `space` in the pane to see them all, and type

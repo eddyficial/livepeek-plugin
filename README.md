@@ -41,12 +41,12 @@ Four things need to be on the machine. peek itself downloads nothing, ever.
 - **The browser driver**, one npm package, installed once by you:
 
   ```
-  npm install -g playwright-core@1.63.0
+  npm add --global playwright-core@1.63.0
   ```
 
   peek finds it from the global install, from the project's own `node_modules`, or from a full `playwright` install. `peek --doctor` tells you if it is missing.
 
-If you point peek at a Vite, Next or Expo project, that project's own `npm install` must already have been run.
+If you point peek at a Vite, Next or Expo project, that project's dependencies must already be in place.
 
 ## Install
 
@@ -80,7 +80,7 @@ copy bin\peek     <that folder>
 On macOS and Linux, `/usr/local/bin` or `~/.local/bin`:
 
 ```
-install -m 755 bin/peek ~/.local/bin/peek
+cp bin/peek ~/.local/bin/peek && chmod +x ~/.local/bin/peek
 ```
 
 Then, from any project folder:
@@ -101,7 +101,7 @@ Every option in [Options](#options) works the same way.
 | a game | any of the above **plus** Phaser, three, Pixi, Babylon, Excalibur, Kaplay, p5 or PlayCanvas | `game-720p`: 16:9, no bezel |
 | a phone app | Expo, React Native | `iphone-15-pro`, with a phone body |
 | a document or mockup | a folder with `index.html`, any `.html`, or a `.md` file (no package.json needed) | `desktop`, or `document` (900×1200) for markdown |
-| something else | nothing detected | pass `--url http://localhost:1234` or `--file path` |
+| something else | nothing detected | give it `--url http://localhost:1234` or `--file path` |
 
 Phones get a drawn phone body, bezel and camera cutout. Web, game and document
 viewports are drawn bare, because a browser viewport or a game canvas *is* the

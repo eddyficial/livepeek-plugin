@@ -160,14 +160,14 @@ function resolveChromium() {
 // installed once by the user; the message says exactly which command.
 export const DRIVER_HINT =
   'The browser driver is not installed. Install it once, then run peek again:\n\n' +
-  '  npm install -g playwright-core@1.63.0\n\n' +
-  'Or per project:  npm i -D playwright-core@1.63.0\n' +
+  '  npm add --global playwright-core@1.63.0\n\n' +
+  'Or per project:  npm add --save-dev playwright-core@1.63.0\n' +
   '(peek --doctor checks for it.)';
 
 /**
  * A Chrome or Edge already on this machine, used as a fallback when
  * playwright is present but its own chromium was never downloaded
- * (`npm i playwright` without the `playwright install` step - a very common
+ * (a `playwright` dependency without its browser setup step - a very common
  * state to be in). Headless, so no window appears either way.
  */
 function findSystemBrowser() {
@@ -211,7 +211,7 @@ async function launchBrowser(chromium) {
     if (!exe) {
       throw new Error(
         'playwright is installed but has no browser to drive, and no system\n' +
-        'Chrome or Edge was found either.\n\nRun:\n  npx playwright install chromium\n\n' +
+        'Chrome or Edge was found either.\n\nAdd a browser with Playwright\'s own browser setup\n(see playwright.dev, "Browsers"), or put Chrome or Edge on this machine.\n\n' +
         'Original error: ' + (bundledErr.message || bundledErr).split('\n')[0]
       );
     }

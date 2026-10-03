@@ -18,7 +18,7 @@ are served by peek itself, with live reload.
 
 Nothing needs installing in the user's project. peek drives the Chrome or
 Edge already on the machine through `playwright-core`, which the user installs
-once (`npm install -g playwright-core@1.63.0`). peek downloads nothing itself.
+once (`npm add --global playwright-core@1.63.0`). peek downloads nothing itself.
 
 ## Launching it
 
@@ -32,7 +32,7 @@ it. The command returns as soon as the pane exists; the view keeps running
 after your turn ends. **Do not** run it with a timeout expecting it to finish,
 and do not run it in the background.
 
-Options, passed through when the user asks:
+Options, added when the user asks:
 
 | option | effect |
 |---|---|
@@ -121,12 +121,12 @@ Check the exit code before reporting success.
 `.html` or `.md` in the directory, peek opens a built-in welcome page that
 tells the user to start building. The pane watches that folder and switches to
 an `index.html`, `.html` or `.md` the moment one appears, with no relaunch. If the user
-meant a specific file or server, pass `--file` or `--url`; do not guess a port.
+meant a specific file or server, give it `--file` or `--url`; do not guess a port.
 
 **"The browser driver is not installed"** (shown inside the pane, or by
 `peek --doctor`): peek downloads nothing itself. Tell the user to run
-`npm install -g playwright-core@1.63.0` once (or `npm i -D` the same package
-in the project), then launch again. Ask before running it for them; it is
+`npm add --global playwright-core@1.63.0` once (or add the same package to the project's
+dev dependencies), then launch again. Ask before running it for them; it is
 an install on their machine.
 
 A pane that fails to start shows the reason and waits for a keypress before
