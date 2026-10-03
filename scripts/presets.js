@@ -1,7 +1,7 @@
 /**
  * Viewport catalogue.
  *
- * `w` / `h` are CSS viewport sizes in logical pixels — the numbers your
+ * `w` / `h` are CSS viewport sizes in logical pixels: the numbers your
  * layout code actually sees. For real devices they are the practical values
  * reported by that device's browser, rounded to whole pixels; treat them as
  * close approximations, not spec-sheet truth. The viewer always prints the

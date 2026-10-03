@@ -9,17 +9,17 @@ your project up in about a minute.
 terminal you're already working in. You edit a file, save, and the pane
 updates. You can click and scroll in it, and type into it.
 
-It works for websites, games, phone apps, and plain files — a markdown
+It works for websites, games, phone apps, and plain files: a markdown
 document or an HTML mockup with no dev server at all.
 
 No browser window. No emulator. Nothing to alt-tab to.
 
 ## Before you start: one requirement
 
-**1. A terminal that can split itself.** `peek` doesn't open a window — it asks
+**1. A terminal that can split itself.** `peek` doesn't open a window; it asks
 your terminal for a new pane. That means you need one of:
 
-- **tmux** — works on macOS, Linux and Windows. If you're unsure, use this.
+- **tmux**: works on macOS, Linux and Windows. If you're unsure, use this.
 - **Zellij**, **Kitty**, **WezTerm**, or **Windows Terminal**
 
 Already in one of those? You're set. If not, the simplest fix on any platform:
@@ -29,11 +29,11 @@ tmux
 ```
 
 Then start Claude Code inside it. (If you're on tmux, also add
-`set -g allow-passthrough on` to your `~/.tmux.conf` — tmux blocks graphics
+`set -g allow-passthrough on` to your `~/.tmux.conf`; tmux blocks graphics
 sequences without it.)
 
 No multiplexer at all? `peek` still works, it just runs in your current pane
-instead of splitting — see `--here` below.
+instead of splitting; see `--here` below.
 
 That's it. The browser engine takes care of itself: on first run `peek`
 fetches a ~3 MB driver into its own folder (no browser download) and uses the
@@ -67,13 +67,13 @@ name. At the bottom, a status line like:
 live   sixel · i type · click name to switch · o rotate · b render · q quit
 ```
 
-`live` means it's updating. `sixel` is the renderer in use — more on that
+`live` means it's updating. `sixel` is the renderer in use; more on that
 below if things look wrong.
 
 For a **phone** project you'll see an actual phone body drawn around the
 screen. For a **website** or **game** you'll see just the viewport with a thin
 border, because a browser viewport or a game canvas *is* the thing you're
-building — a phone frame around it would misrepresent it.
+building: a phone frame around it would misrepresent it.
 
 ## Opening it without Claude
 
@@ -104,8 +104,8 @@ Once it's focused:
 | key | does |
 |---|---|
 | **click / scroll** | goes straight through to the page |
-| **`i`** | typing mode — your keystrokes go to the page. `esc` stops |
-| **`space`** | pick a device — start typing to filter (`iph`, `sam`, `pixel`) |
+| **`i`** | typing mode: your keystrokes go to the page. `esc` stops |
+| **`space`** | pick a device: start typing to filter (`iph`, `sam`, `pixel`) |
 | **`p`** | switch project: every folder you have peeked before, plus any dev server running. Pick a stopped one and peek starts it |
 | `shift`+`?` | show every key |
 | `[` `]` | previous / next device |
@@ -124,9 +124,9 @@ In the viewport picker, `↑`/`↓` move the selection and `enter` picks it.
 closes. Clicking works too.
 
 Alt+arrow and ctrl+arrow are deliberately left alone so your terminal still
-gets them — that's usually how you move between panes.
+gets them; that's usually how you move between panes.
 
-**Quit with `q`**, not by killing the process — that shuts the headless
+**Quit with `q`**, not by killing the process; that shuts the headless
 browser down cleanly instead of leaving it running in the background.
 
 ### Typing into your app
@@ -191,7 +191,7 @@ the thing you mean:
 
 **The page is blank.** Your dev server is up but serving nothing useful. Open
 the URL in a normal browser to confirm. For Expo projects it's usually missing
-web-build dependencies — `peek` will tell you and offer to install them.
+web-build dependencies; `peek` will tell you and offer to install them.
 
 **It's tiny or cut off.** The pane is too narrow for the viewport. Try a wider
 pane or a smaller viewport:
@@ -208,10 +208,10 @@ pane or a smaller viewport:
 | a website | Next, Nuxt, SvelteKit, Astro, Remix, Gatsby, Docusaurus, Angular, CRA, Vite, Parcel, webpack | 1440×900 desktop |
 | a game | any of those **plus** Phaser, three, Pixi, Babylon, Excalibur, Kaplay, p5, PlayCanvas | 16:9 720p |
 | a phone app | Expo, React Native | iPhone 15 Pro, with a phone body |
-| a document or mockup | `index.html`, any `.html`, any `.md` — no package.json needed | desktop, or a 900×1200 page for markdown |
-| anything else | — | pass `--url` or `--file` |
+| a document or mockup | `index.html`, any `.html`, any `.md` (no package.json needed) | desktop, or a 900×1200 page for markdown |
+| anything else | nothing detected | pass `--url` or `--file` |
 
-33 viewports ship with it — 21 real devices, 6 web breakpoints, 5 game aspect
+33 viewports ship with it: 21 real devices, 6 web breakpoints, 5 game aspect
 ratios, 2 document pages. Press `space` in the pane to see them all, and type
 to filter the list.
 
@@ -233,20 +233,20 @@ to filter the list.
 
 ## When peek is the wrong tool
 
-It drives a real browser, so it shows what a browser shows — and nothing else.
+It drives a real browser, so it shows what a browser shows, and nothing else.
 
 - **Phone apps** render their *web* build. Native-only modules aren't there:
   `react-native-maps`, `expo-camera`, native Stripe, background location, push
   notifications. Those screens render empty or throw. Use a real device or an
   emulator for them.
 - **Games** render on canvas and WebGL fine, but what you see refreshes every
-  600 ms — that's the screenshot interval, not your frame rate. It's for
+  600 ms; that's the screenshot interval, not your frame rate. It's for
   watching layout and state, not judging animation. `--interval 200` gets
   closer, at the cost of CPU.
 - **Held keys** are approximated. Outside a text field each press is held for
-  90 ms so games can see it — WASD moves properly — but there's no continuous
+  90 ms so games can see it, WASD moves properly, but there's no continuous
   held state, so charge-up mechanics will feel approximate.
-- **Pixel-exact design review** — half-block mode especially is approximate.
+- **Pixel-exact design review**: half-block mode especially is approximate.
   Use a real browser for final visual QA.
 
 ## Letting Claude check its own work
@@ -258,6 +258,6 @@ PNG it wrote is the page at full size.
 
 ## Still stuck?
 
-Ask Claude in your session — the plugin ships a skill, so Claude knows how it
+Ask Claude in your session: the plugin ships a skill, so Claude knows how it
 works, what the error codes mean, and how to fix the common problems. "the
 peek pane looks wrong" is a perfectly good prompt.

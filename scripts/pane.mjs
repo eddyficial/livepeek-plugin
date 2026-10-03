@@ -353,7 +353,7 @@ async function main() {
       rev: (open.rev || 0) + 1,
     });
     const what = STATIC ? `${STATIC.file || 'index.html'} in ${STATIC.dir}` : TARGET;
-    console.log(`reusing the open pane — ${what} at ${PRESET}`);
+    console.log(`reusing the open pane: ${what} at ${PRESET}`);
     console.log('  (--new splits a second pane instead)');
     // a retarget that also asked for a snapshot waits for it, the same as a
     // bare --snapshot does, so the caller can read the file straight away
@@ -432,7 +432,7 @@ async function main() {
     }
   }
 
-  console.log(`\npeek opened (${host}) — ${TARGET} at ${PRESET}`);
+  console.log(`\npeek opened (${host}): ${TARGET} at ${PRESET}`);
   console.log('  keys   space device  ·  p project  ·  shift+? help  ·  q quit  ·  mouse works');
   console.log('  close  press q in the pane so the headless browser shuts down cleanly');
 }

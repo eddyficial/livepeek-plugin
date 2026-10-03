@@ -4,15 +4,15 @@ description: Open a live view of whatever the user is building - a website, a ga
 version: 0.3.0
 ---
 
-# peek — a live viewing portal in the terminal
+# peek: a live viewing portal in the terminal
 
 Opens a live view of the current project in a split pane in the user's
 existing terminal. No browser window, no emulator, nothing to alt-tab to.
 
 The pane is interactive: click and scroll go through to the page.
 
-Works for anything a dev server can serve — websites, games on a canvas, phone
-apps through their web build — and for things with no server at all: a folder
+Works for anything a dev server can serve (websites, games on a canvas, phone
+apps through their web build) and for things with no server at all: a folder
 with an `index.html`, a single `.html` mockup, or a markdown document. Those
 are served by peek itself, with live reload.
 
@@ -82,7 +82,7 @@ the pane, the loop is: edit, wait ~2s, snapshot, look, report what you see.
 ## One pane, reused
 
 **If a pane is already open, this retargets it instead of splitting again** and
-prints `reusing the open pane`. That is correct and expected — launching from a
+prints `reusing the open pane`. That is correct and expected; launching from a
 website project and then from a phone project leaves one pane that switches
 between them. Do not treat it as a failure, and do not reach for `--new` unless
 the user actually asks for two views side by side.
@@ -105,7 +105,7 @@ Terminal keep the dead pane on screen. Use `--quit`, or tell the user to press
 | any of the above **plus** a canvas library (Phaser, three, Pixi, Babylon, Excalibur, Kaplay, p5, PlayCanvas) | varies | `game-720p` (16:9), no bezel |
 
 Phone presets get a phone body with bezel and camera cutout. Web, game and
-document presets are drawn bare — a browser viewport or a game canvas *is* the thing
+document presets are drawn bare: a browser viewport or a game canvas *is* the thing
 being built, so a phone frame around it would misrepresent it.
 
 If the user wants a different shape, `--preset` accepts phones, tablets, web
@@ -123,7 +123,7 @@ tells the user to start building. The pane watches that folder and switches to
 an `index.html`, `.html` or `.md` the moment one appears, with no relaunch. If the user
 meant a specific file or server, pass `--file` or `--url`; do not guess a port.
 
-**"Could not fetch playwright-core automatically"** (shown inside the pane) —
+**"Could not fetch playwright-core automatically"** (shown inside the pane):
 the one-time driver download failed, usually no network or an npm proxy. The
 fallback is `npm i -D playwright-core` in the user's project, which peek also
 finds. Full `playwright` plus `npx playwright install chromium` works too and
@@ -132,9 +132,9 @@ is preferred when present.
 A pane that fails to start shows the reason and waits for a keypress before
 closing, so the user can read it. Ask them what it said.
 
-**`2` — missing framework dependencies.** Expo needs `react-dom` and
+**`2`: missing framework dependencies.** Expo needs `react-dom` and
 `react-native-web` for the web build, or the dev server returns a blank page.
-The script prints the exact install command. Offer to run it, and ask first —
+The script prints the exact install command. Offer to run it, and ask first:
 it modifies their `package.json`.
 
 **`3` in the VS Code terminal** (the message names VS Code). Nothing can
@@ -145,10 +145,10 @@ split that terminal from outside, so tell the user to split it by hand
 the pane then shows text rather than a picture, the VS Code setting
 `terminal.integrated.enableImages` is off; suggest enabling it.
 
-**`3` — no terminal multiplexer.** There is no pane to split. Supported hosts
+**`3`: no terminal multiplexer.** There is no pane to split. Supported hosts
 are tmux, Zellij, Kitty, WezTerm and Windows Terminal. Tell the user either to
 start `tmux` (works everywhere) or to use `--here`, which runs in the current
-pane. Do not suggest opening a browser window — staying in the terminal is the
+pane. Do not suggest opening a browser window; staying in the terminal is the
 entire point of this plugin.
 
 ## Errors on the page
@@ -169,22 +169,22 @@ press `e` to read the messages.
 
 The renderer is probed at startup and the footer names which one is active.
 
-- **Coloured mush or garbage characters** — the probe guessed wrong. Tell the
+- **Coloured mush or garbage characters**: the probe guessed wrong. Tell the
   user to press `b` to cycle kitty graphics → sixel → half-blocks.
-- **Blocky but legible** — that's the half-block fallback, meaning the
+- **Blocky but legible**: that's the half-block fallback, meaning the
   terminal reported neither kitty graphics nor sixel. It works, it's just
   coarse. Kitty, Ghostty, WezTerm, Windows Terminal 1.22+ and xterm do better.
-- **Blank page** — the server is up but serving nothing useful. For Expo it's
+- **Blank page**: the server is up but serving nothing useful. For Expo it's
   usually the missing web deps above. Check the URL directly first.
-- **The pane shows the page as text, footer says `text`** — the host draws
+- **The pane shows the page as text, footer says `text`**: the host draws
   no graphics (Zellij on Windows does this), so peek renders the DOM as
   readable text: headings, paragraphs, links, buttons, inputs. Clicks and
   scrolling still work; `--snapshot` still writes the real pixels. This is
   expected there. For a sharp picture, run peek from a Windows Terminal pane
   instead of inside Zellij.
-- **Nothing renders under tmux** — tmux needs `set -g allow-passthrough on`
+- **Nothing renders under tmux**: tmux needs `set -g allow-passthrough on`
   for graphics sequences to reach the terminal.
-- **Tiny or cropped** — the pane is too narrow for the viewport. Suggest
+- **Tiny or cropped**: the pane is too narrow for the viewport. Suggest
   `--size 0.5`, or a smaller preset.
 
 ## Keys, for when the user asks
@@ -194,9 +194,9 @@ Focus the pane first (`alt`+arrow in most terminals, `prefix`+arrow in tmux).
 | key | does |
 |---|---|
 | click / scroll | goes through to the page |
-| `i` | typing mode — keystrokes go to the page; `esc` stops |
-| `space` | device picker — typing filters the list (`iph`, `sam`, `pixel`, `desk`) |
-| `p` | switch project — folders peek has shown before (kept in `~/.peek/projects.json`), plus any dev server currently running; picking a stopped framework project starts its dev server |
+| `i` | typing mode: keystrokes go to the page; `esc` stops |
+| `space` | device picker: typing filters the list (`iph`, `sam`, `pixel`, `desk`) |
+| `p` | switch project: folders peek has shown before (kept in `~/.peek/projects.json`), plus any dev server currently running; picking a stopped framework project starts its dev server |
 | `shift`+`?` | help overlay listing every key |
 | `[` `]` | previous / next device |
 | `o` | rotate |
@@ -213,15 +213,15 @@ Inside the preset picker: `↑`/`↓` move, `PageUp`/`PageDown` jump, `Home`/`En
 go to the ends, `enter` selects, `esc` closes. The mouse works too.
 
 Keys with alt or ctrl held are ignored by the viewer so they reach the
-terminal — alt+arrow is how most terminals move between panes.
+terminal; alt+arrow is how most terminals move between panes.
 
-Tell users to quit with `q` rather than killing the process — that shuts the
+Tell users to quit with `q` rather than killing the process; that shuts the
 headless browser down cleanly instead of orphaning it.
 
 **Typing mode is modal and worth explaining when it comes up.** Press `i` and
 text, arrows, Enter, Tab, Backspace, Home/End/PageUp/PageDown, Delete and
 ctrl+letter all go to the page. While it is on, `q` types a `q` rather than
-quitting — `esc` leaves typing mode and `ctrl+c` quits from either mode. The
+quitting; `esc` leaves typing mode and `ctrl+c` quits from either mode. The
 footer shows a badge so the state is never ambiguous.
 
 To fill in a form the user must **click the field first** so it has focus, then
@@ -230,7 +230,7 @@ press `i`. A click focuses exactly as it would in a browser. If a user reports
 
 ## Limits worth stating plainly
 
-It drives a real browser, so it shows whatever a browser shows — and only
+It drives a real browser, so it shows whatever a browser shows, and only
 that.
 
 - **Phone apps** render their *web* build. Native-only modules are absent:

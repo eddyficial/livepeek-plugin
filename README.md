@@ -2,8 +2,8 @@
 
 A live viewing portal in your terminal.
 
-Whatever you're building — a website, a game, a phone app, a document, a
-mockup — `peek` renders it live in a split pane next to your work. Edit a
+Whatever you're building (a website, a game, a phone app, a document, a
+mockup), `peek` renders it live in a split pane next to your work. Edit a
 file, save, watch it change. Click, scroll and type go through to the page.
 
 And Claude can look too: after it changes something, it snapshots the pane and
@@ -24,7 +24,7 @@ No browser window. No emulator. Nothing to alt-tab to.
 That's the whole interface. It works out what your project is, starts the dev
 server if it isn't running, detects your terminal, and splits it.
 
-Run it again from a different project and the **same pane** switches to it —
+Run it again from a different project and the **same pane** switches to it,
 website, game, phone app. One pane that follows what you're working on, not a
 new one each time. Press `p` inside the pane to switch without leaving it.
 
@@ -90,17 +90,17 @@ Every option in [Options](#options) works the same way.
 
 | you're building | detected from | opens on |
 |---|---|---|
-| a website | Next, Nuxt, SvelteKit, Astro, Remix, Gatsby, Docusaurus, Angular, CRA, Vite, Parcel, webpack | `desktop` — 1440×900, no bezel |
-| a game | any of the above **plus** Phaser, three, Pixi, Babylon, Excalibur, Kaplay, p5 or PlayCanvas | `game-720p` — 16:9, no bezel |
+| a website | Next, Nuxt, SvelteKit, Astro, Remix, Gatsby, Docusaurus, Angular, CRA, Vite, Parcel, webpack | `desktop`: 1440×900, no bezel |
+| a game | any of the above **plus** Phaser, three, Pixi, Babylon, Excalibur, Kaplay, p5 or PlayCanvas | `game-720p`: 16:9, no bezel |
 | a phone app | Expo, React Native | `iphone-15-pro`, with a phone body |
-| a document or mockup | a folder with `index.html`, any `.html`, or a `.md` file — no package.json needed | `desktop`, or `document` (900×1200) for markdown |
-| something else | — | pass `--url http://localhost:1234` or `--file path` |
+| a document or mockup | a folder with `index.html`, any `.html`, or a `.md` file (no package.json needed) | `desktop`, or `document` (900×1200) for markdown |
+| something else | nothing detected | pass `--url http://localhost:1234` or `--file path` |
 
 Phones get a drawn phone body, bezel and camera cutout. Web, game and document
 viewports are drawn bare, because a browser viewport or a game canvas *is* the
-thing you're building — a phone frame around it would be a lie.
+thing you're building: a phone frame around it would be a lie.
 
-Markdown is rendered as a page with live reload, served by `peek` itself —
+Markdown is rendered as a page with live reload, served by `peek` itself;
 no dependency, no dev server. Plain HTML gets the same reloader injected.
 
 33 presets ship with it: 21 real devices, 6 web breakpoints, 5 game aspect
@@ -160,7 +160,7 @@ The pane is created by whichever multiplexer is hosting you:
 | WezTerm | the `WEZTERM_PANE` variable |
 | Windows Terminal | the `WT_SESSION` variable |
 
-tmux works on macOS, Linux and Windows, so it's the universal fallback — start
+tmux works on macOS, Linux and Windows, so it's the universal fallback: start
 `tmux` and you have a pane anywhere. With no multiplexer at all, `--here` runs
 the view in your current pane instead.
 
@@ -180,20 +180,20 @@ fresh one opens where you are now.
 
 ## Keys
 
-Focus the pane first — `alt`+arrow in most terminals, `prefix`+arrow in tmux.
+Focus the pane first: `alt`+arrow in most terminals, `prefix`+arrow in tmux.
 
 | key | does |
 |---|---|
 | click / scroll | goes through to the page |
-| `i` | **typing mode** — send keystrokes to the page |
-| `space` | **pick a device** — start typing to filter: `iph`, `sam`, `pixel`, `desk` |
-| `p` | **switch project** — every folder you have peeked before, plus any dev server running |
+| `i` | **typing mode**: send keystrokes to the page |
+| `space` | **pick a device**; start typing to filter: `iph`, `sam`, `pixel`, `desk` |
+| `p` | **switch project**: every folder you have peeked before, plus any dev server running |
 | `shift`+`?` | help overlay with every key |
 | `[` `]` | previous / next device |
 | `o` | rotate |
 | `r` | reload |
-| `e` | **page errors** — the footer shows a red count when the page throws; `e` lists them |
-| `d` | dark / light — flips `prefers-color-scheme` so you see both themes |
+| `e` | **page errors**: the footer shows a red count when the page throws; `e` lists them |
+| `d` | dark / light: flips `prefers-color-scheme` so you see both themes |
 | `+` `-` `0` | zoom in / out / reset |
 | `c` | copy the frame to the clipboard as an image |
 | `.` | pause refreshing |
@@ -204,14 +204,14 @@ In the preset picker: `↑`/`↓` move, `PageUp`/`PageDown` jump, `Home`/`End` g
 to the ends, `enter` selects, `esc` closes.
 
 Anything with alt or ctrl held is left alone, so your terminal's own bindings
-still work — alt+arrow moves between panes rather than reaching the viewer.
+still work; alt+arrow moves between panes rather than reaching the viewer.
 
-Quit with `q` rather than killing it — that shuts the headless browser down
+Quit with `q` rather than killing it; that shuts the headless browser down
 cleanly instead of orphaning it.
 
 ### Typing
 
-Press `i` and every keystroke goes to the page instead of the viewer — text,
+Press `i` and every keystroke goes to the page instead of the viewer: text,
 arrows, Enter, Tab, Backspace, Home/End/PageUp/PageDown, Delete, and
 ctrl+letter combinations. `esc` stops.
 
@@ -219,11 +219,11 @@ Which necessarily means `q` no longer quits while you're typing: it types a
 `q`. The footer turns into a badge saying so, and `ctrl+c` always quits
 regardless of mode.
 
-To fill in a form, click the field first — the click focuses it, the same way
-it would in a browser — then press `i` and type.
+To fill in a form, click the field first: the click focuses it, the same way
+it would in a browser, then press `i` and type.
 
 **Games get different treatment, automatically.** A terminal reports
-keystrokes, never "still held" — so a game sampling input once per frame would
+keystrokes, never "still held", so a game sampling input once per frame would
 miss almost every press. When the focus isn't a text field, each key is held
 down for 90 ms instead, long enough for several frames to see it. WASD moves
 properly.
@@ -265,7 +265,7 @@ the one who has to say "no, it's still wrong".
 
 ## Limits
 
-It drives a real browser, so it shows what a browser shows — and only that.
+It drives a real browser, so it shows what a browser shows, and only that.
 
 - **Phone apps** render their *web* build. Native-only modules are absent:
   `react-native-maps`, `expo-camera`, native Stripe, background location, push

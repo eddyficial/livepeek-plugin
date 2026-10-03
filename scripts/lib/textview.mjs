@@ -61,7 +61,7 @@ export const EXTRACT = `(() => {
     const cs = getComputedStyle(el);
     if (cs.display === 'none' || cs.visibility === 'hidden' || el.hidden) return;
     if (t === 'BR') { add('\\n', ctx.id, ctx.role); return; }
-    if (t === 'HR') { open('hr'); add('—'); open('p'); return; }
+    if (t === 'HR') { open('hr'); add('-'); open('p'); return; }
     if (t === 'IMG') { add('[image' + (el.alt ? ': ' + el.alt : '') + ']'); return; }
     const isBlock = BLOCK.has(t) || /^(block|flex|grid|list-item|table|table-row|table-cell|flow-root)$/.test(cs.display);
     const clickable = t === 'A' && el.href || t === 'BUTTON' || t === 'SUMMARY' || t === 'LABEL'

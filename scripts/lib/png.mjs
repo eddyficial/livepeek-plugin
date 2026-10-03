@@ -1,4 +1,4 @@
-// Minimal PNG decoder — just enough for Chromium screenshots.
+// Minimal PNG decoder, just enough for Chromium screenshots.
 //
 // Chromium emits 8-bit non-interlaced RGBA (colour type 6) or RGB (type 2),
 // so those are the only cases handled. Anything else throws loudly rather

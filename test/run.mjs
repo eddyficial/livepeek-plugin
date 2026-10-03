@@ -201,7 +201,7 @@ await test('textview.layoutText wraps, keeps spans, bullets and rules', async ()
     { kind: 'h1', parts: [{ text: 'Title' }] },
     { kind: 'p', parts: [{ text: 'Read the ' }, { text: 'docs', id: '1', role: 'link' }, { text: ' now and keep going with more words so the line wraps around the width' }] },
     { kind: 'li', parts: [{ text: 'one' }] },
-    { kind: 'hr', parts: [{ text: '—' }] },
+    { kind: 'hr', parts: [{ text: '-' }] },
   ];
   const lines = layoutText(blocks, width);
   const plain = (l) => l.text.replace(/\x1b\[[0-9;]*m/g, '');
