@@ -21,7 +21,18 @@ const ESC = '\x1b';
 
 // A throwaway HOME, set before any peek module is imported: projects.mjs and
 // session.mjs read os.homedir() at load time and must never touch the real one.
-const REAL_ENV = { ...process.env };    // the browser needs the real profile locations
+// Child processes get an allowlist, never a copy of the whole environment:
+// the browser needs profile and temp locations and PATH, not whatever tokens
+// the developer happens to have exported in their shell.
+const KEEP = ['PATH', 'Path', 'PATHEXT', 'SystemRoot', 'SYSTEMROOT', 'windir', 'ComSpec', 'TEMP', 'TMP', 'TMPDIR',
+  'HOME', 'USERPROFILE', 'APPDATA', 'LOCALAPPDATA', 'ProgramData', 'ProgramFiles', 'ProgramFiles(x86)',
+  'XDG_RUNTIME_DIR', 'XDG_CONFIG_HOME', 'XDG_CACHE_HOME', 'DISPLAY', 'WAYLAND_DISPLAY', 'LANG', 'LC_ALL'];
+function safeEnv(extra = {}) {
+  const env = {};
+  for (const k of KEEP) if (process.env[k] !== undefined) env[k] = process.env[k];
+  return { ...env, ...extra };
+}
+const REAL_ENV = safeEnv();             // the browser needs the real profile locations
 const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'peek-test-'));
 const HOME = path.join(TMP, 'home');
 fs.mkdirSync(HOME);
@@ -51,7 +62,7 @@ function eq(a, b, msg) {
 
 /** Run a peek script as a child with a clean, multiplexer-free environment. */
 function run(script, args, cwd) {
-  const env = { ...process.env, HOME, USERPROFILE: HOME };
+  const env = safeEnv({ HOME, USERPROFILE: HOME });
   for (const k of ['TMUX', 'ZELLIJ', 'KITTY_LISTEN_ON', 'WEZTERM_PANE', 'WT_SESSION']) delete env[k];
   const r = spawnSync(process.execPath, [path.join(SCRIPTS, script), ...args], {
     cwd, env, encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'],
@@ -133,7 +144,7 @@ await test('serveStatic renders README.md with an h1 and live reload', async () 
 });
 
 // Raw request: fetch() would collapse "/%2e%2e/" before it reached the server.
-const rawGet = (base, rawPath) => new Promise((resolve, reject) => {
+const httpGetRaw = (base, rawPath) => new Promise((resolve, reject) => {
   const u = new URL(base);
   http.get({ host: u.hostname, port: u.port, path: rawPath }, (res) => {
     let body = '';
@@ -157,11 +168,11 @@ await test('serveStatic refuses path traversal, including sibling dirs sharing t
     ({ server, port } = await serveStatic({ root: path.join(base, 'site') }));
     const url = `http://127.0.0.1:${port}/`;
     for (const p of ['/..%2fsite2%2fsecret.txt', '/%2e%2e/outside.txt', '/..%5coutside.txt', '/..%2foutside.txt']) {
-      const r = await rawGet(url, p);
+      const r = await httpGetRaw(url, p);
       assert(r.status === 403 || r.status === 404, `${p}: status ${r.status}, want 403 or 404`);
       assert(!r.body.includes('SECRET') && !r.body.includes('OUTSIDE'), `${p}: leaked file contents`);
     }
-    eq((await rawGet(url, '/index.html')).status, 200, 'legit file still served');
+    eq((await httpGetRaw(url, '/index.html')).status, 200, 'legit file still served');
   } finally {
     if (server) { server.close(); server.closeAllConnections?.(); }
     fs.rmSync(base, { recursive: true, force: true });
@@ -172,15 +183,15 @@ await test('serveStatic answers malformed percent-encoding with 400 and keeps se
   const dir = tmpdir('serve-badpct');
   fs.writeFileSync(path.join(dir, 'index.html'), '<h1>ok</h1>');
   const url = await serve(dir);
-  eq((await rawGet(url, '/%E0%A4%A')).status, 400, 'malformed escape');
-  eq((await rawGet(url, '/index.html')).status, 200, 'server still alive');
+  eq((await httpGetRaw(url, '/%E0%A4%A')).status, 400, 'malformed escape');
+  eq((await httpGetRaw(url, '/index.html')).status, 200, 'server still alive');
 });
 
 await test('serveStatic returns 204 for /favicon.ico when the root has none', async () => {
   const dir = tmpdir('serve-favicon');
   fs.writeFileSync(path.join(dir, 'index.html'), '<h1>ok</h1>');
   const url = await serve(dir);
-  eq((await rawGet(url, '/favicon.ico')).status, 204, 'favicon status');
+  eq((await httpGetRaw(url, '/favicon.ico')).status, 204, 'favicon status');
 });
 
 await test('textview.layoutText wraps, keeps spans, bullets and rules', async () => {
