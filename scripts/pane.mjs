@@ -396,7 +396,7 @@ async function main() {
       '     (or just: peek --here, if the peek command is installed)\n\n' +
       'For pictures instead of text, turn on the VS Code setting\n' +
       '  terminal.integrated.enableImages\n' +
-      'and restart the terminal. Without it peek shows the page as text.\n\n' +
+      'and reload the window (Developer: Reload Window). Without it peek shows the page as text.\n\n' +
       'Or run tmux inside the VS Code terminal and peek splits it for you.\n',
       3
     );
