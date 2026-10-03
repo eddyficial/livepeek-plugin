@@ -110,6 +110,16 @@ function applyEnvHints(caps) {
   if (process.env.WT_SESSION) caps.sixel = true;      // Windows Terminal >= 1.22
   if (term.includes('mlterm') || term.includes('foot')) caps.sixel = true;
 
+  // Zellij on Windows passes the terminal's "I can do sixel" reply through
+  // but draws neither sixel nor kitty graphics itself: the pane stays black
+  // with a footer saying "live". Verified on Zellij 0.44 over Windows
+  // Terminal. Half-blocks are the only thing that shows there.
+  if (process.env.ZELLIJ !== undefined && process.platform === 'win32') {
+    caps.sixel = false;
+    caps.kitty = false;
+    caps.note = 'zellij on windows shows no graphics: text mode (b to try anyway)';
+  }
+
   caps.tmux = !!process.env.TMUX;
   return caps;
 }

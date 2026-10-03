@@ -169,6 +169,7 @@ const previewCmd = [
   '--preset', PRESET,
   '--interval', String(INTERVAL),
   '--host', detectHost() || 'none',
+  ...(arg('--render', null) ? ['--render', arg('--render', null)] : []),
   ...(welcome ? ['--watch-dir', process.cwd()] : []),
   ...serveArgs,
   ...(SNAPSHOT ? ['--snapshot', path.resolve(SNAPSHOT)] : []),

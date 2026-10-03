@@ -1295,6 +1295,7 @@ async function main() {
   caps = await probeTerminal();
   cw = caps.cw; ch = caps.ch; termBg = caps.bg;
   renderMode = pickRenderer(caps, RENDER);
+  if (caps.note && RENDER === 'auto') statusMsg = caps.note;
 
   out(`${ESC}[?1000h${ESC}[?1002h${ESC}[?1003h${ESC}[?1006h`);   // mouse: clicks, drag, hover, SGR coords
 

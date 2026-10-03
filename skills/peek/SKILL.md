@@ -166,6 +166,10 @@ The renderer is probed at startup and the footer names which one is active.
   coarse. Kitty, Ghostty, WezTerm, Windows Terminal 1.22+ and xterm do better.
 - **Blank page** — the server is up but serving nothing useful. For Expo it's
   usually the missing web deps above. Check the URL directly first.
+- **Black image area but the footer says `live`, in Zellij on Windows** —
+  Zellij there draws no graphics. peek now detects this and uses half-blocks
+  with a footer note. For a sharp picture tell the user to run peek from a
+  Windows Terminal pane instead of inside Zellij.
 - **Nothing renders under tmux** — tmux needs `set -g allow-passthrough on`
   for graphics sequences to reach the terminal.
 - **Tiny or cropped** — the pane is too narrow for the viewport. Suggest

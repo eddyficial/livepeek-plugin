@@ -138,6 +138,8 @@ Under tmux, graphics need passthrough enabled:
 set -g allow-passthrough on
 ```
 
+**Zellij on Windows** shows no sixel or kitty graphics, so peek falls back to half-block text there and says so in the footer. For a sharp picture on Windows, run peek from a Windows Terminal pane directly; Zellij on macOS and Linux is unaffected.
+
 One pane follows you between terminals too. If you open peek in Windows
 Terminal, then move into Zellij and run it again, the old pane is closed and a
 fresh one opens where you are now.
