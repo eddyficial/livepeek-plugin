@@ -1,0 +1,57 @@
+name: test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # the browser driver peek fetches on first run; pinned to the same
+      # version tui.mjs installs
+      - name: Install playwright-core
+        run: npm i --no-save playwright-core@1.63.0 --prefix scripts
+
+      # playwright-core cannot download browsers itself, so use the full CLI
+      - name: Install Chromium
+        run: npx playwright@1.63.0 install --with-deps chromium
+
+      - name: Locate Chromium
+        shell: bash
+        run: |
+          node -e '
+            const fs = require("fs"), path = require("path"), os = require("os");
+            const base = process.env.PLAYWRIGHT_BROWSERS_PATH
+              || (process.platform === "win32"
+                    ? path.join(process.env.LOCALAPPDATA, "ms-playwright")
+                    : path.join(os.homedir(), ".cache", "ms-playwright"));
+            const exeNames = process.platform === "win32" ? ["chrome.exe"] : ["chrome"];
+            const found = [];
+            const walk = (d, depth) => {
+              if (depth > 5) return;
+              let ents; try { ents = fs.readdirSync(d, { withFileTypes: true }); } catch { return; }
+              for (const e of ents) {
+                const p = path.join(d, e.name);
+                if (e.isDirectory()) walk(p, depth + 1);
+                else if (exeNames.includes(e.name) && /chromium-\d+/.test(p) && !/headless_shell/.test(p)) found.push(p);
+              }
+            };
+            walk(base, 0);
+            console.log("chromium candidates:", found);
+            if (!found.length) { console.error("no chromium found under " + base); process.exit(1); }
+            fs.appendFileSync(process.env.GITHUB_ENV, "PEEK_BROWSER=" + found[0] + "\n");
+          '
+
+      - name: Test
+        run: node test/run.mjs

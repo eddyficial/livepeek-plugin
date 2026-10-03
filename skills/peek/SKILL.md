@@ -48,6 +48,8 @@ Options, passed through when the user asks:
 | `--quit` | close the open pane cleanly |
 | `--snapshot out.png` | write what the open pane is showing to a PNG |
 | `--eval '<js>'` | run a snippet in the shown page, print the JSON result |
+| `--compare a,b` | two panes side by side, one per preset (`desktop,iphone-15-pro`). `--quit` closes only the last one opened; the user presses `q` in the other |
+| `--doctor` | diagnose: Node, browser, driver, multiplexer, graphics. Run this first when the pane will not open or renders garbage |
 | `--dry-run` | print what it would do and exit |
 
 ## Look at what you changed
@@ -115,8 +117,8 @@ Check the exit code before reporting success.
 
 **An empty folder is fine.** With no dev server dependency and no `index.html`,
 `.html` or `.md` in the directory, peek opens a built-in welcome page that
-tells the user to start building. As soon as an `index.html` appears or a dev
-server starts there, launch again and the pane switches to it. If the user
+tells the user to start building. The pane watches that folder and switches to
+an `index.html`, `.html` or `.md` the moment one appears, with no relaunch. If the user
 meant a specific file or server, pass `--file` or `--url`; do not guess a port.
 
 **"Could not fetch playwright-core automatically"** (shown inside the pane) —
@@ -138,6 +140,20 @@ are tmux, Zellij, Kitty, WezTerm and Windows Terminal. Tell the user either to
 start `tmux` (works everywhere) or to use `--here`, which runs in the current
 pane. Do not suggest opening a browser window — staying in the terminal is the
 entire point of this plugin.
+
+## Errors on the page
+
+The session file `~/.peek/session.json` carries `errors`, the number of
+uncaught exceptions and `console.error` calls on the current page since it
+loaded. After you change something, read it along with the snapshot:
+
+```bash
+node -e "console.log(JSON.parse(require('fs').readFileSync(require('os').homedir()+'/.peek/session.json')).errors)"
+```
+
+A non-zero count means your change broke something even if the page still
+paints. The user sees the same number as a red badge in the footer and can
+press `e` to read the messages.
 
 ## If the view looks wrong
 
@@ -169,6 +185,10 @@ Focus the pane first (`alt`+arrow in most terminals, `prefix`+arrow in tmux).
 | `[` `]` | previous / next device |
 | `o` | rotate |
 | `r` | reload |
+| `e` | list page errors; the footer shows a red `N errors` badge whenever the page has thrown or logged `console.error` |
+| `d` | toggle dark / light by emulating `prefers-color-scheme` |
+| `+` `-` `0` | zoom in / out / reset (CSS zoom, viewport unchanged) |
+| `c` | copy the current frame to the system clipboard |
 | `.` | pause refreshing |
 | `b` | cycle renderer |
 | `q` | quit and close the pane |

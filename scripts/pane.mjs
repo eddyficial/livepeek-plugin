@@ -33,6 +33,12 @@ const arg = (n, d) => {
 
 const SIZE     = parseFloat(arg('--size', '0.34'));
 const INTERVAL = parseInt(arg('--interval', '600'), 10);
+if (flag('--doctor')) {
+  const { spawnSync } = await import('node:child_process');
+  const r = spawnSync(process.execPath, [path.join(__dirname, 'doctor.mjs')], { stdio: 'inherit' });
+  process.exit(r.status ?? 1);
+}
+
 const URL_ARG  = arg('--url', null);
 const PRESET_ARG = arg('--preset', arg('--device', null));   // --device kept as an alias
 
@@ -120,7 +126,7 @@ const PORT   = parseInt(arg('--port', String(fw?.port ?? 3000)), 10);
 const TARGET = URL_ARG || (STATIC ? 'static' : `http://localhost:${PORT}`);
 // Web and document views default to 'fit': rendered at the pane's own pixel
 // size, so text is never scaled down. Fixed presets stay one --preset away.
-const PRESET = PRESET_ARG
+const PRESET = (arg('--compare', null) || '').split(',')[0] || PRESET_ARG
   || (STATIC ? 'fit' : null)
   || (fw?.preset && fw.preset !== 'desktop' ? fw.preset : 'fit');
 
@@ -163,6 +169,7 @@ const previewCmd = [
   '--preset', PRESET,
   '--interval', String(INTERVAL),
   '--host', detectHost() || 'none',
+  ...(welcome ? ['--watch-dir', process.cwd()] : []),
   ...serveArgs,
   ...(SNAPSHOT ? ['--snapshot', path.resolve(SNAPSHOT)] : []),
 ];
@@ -299,6 +306,7 @@ async function main() {
       // a dev-server project: the open pane has to start its server, or the
       // page it navigates to is empty (or someone else's)
       serve: serveArgs[0] === '--serve' ? { script: fw.script, cwd: root, port: PORT } : null,
+      watch: welcome ? process.cwd() : null,
       static: STATIC ? STATIC.dir : null,
       file: STATIC ? STATIC.file : null,
       preset: PRESET,
@@ -349,6 +357,18 @@ async function main() {
   const r = spawnSync(cmd, args, { stdio: 'inherit', cwd: paneCwd });
   if (r.error || (r.status != null && r.status !== 0)) {
     die(`Could not split the ${host} pane: ${r.error?.message || 'exit ' + r.status}`);
+  }
+
+  const compare = arg('--compare', null);
+  if (compare) {
+    // "--compare desktop,iphone-15-pro": this pane got the first, open a
+    // second pane for the other so the two sit side by side
+    const second = compare.split(',')[1];
+    if (second) {
+      const rest = argv.filter((a, i, all) => a !== '--compare' && all[i - 1] !== '--compare'
+        && a !== '--preset' && all[i - 1] !== '--preset' && a !== '--new');
+      spawnSync(process.execPath, [path.join(__dirname, 'pane.mjs'), ...rest, '--new', '--preset', second], { stdio: 'inherit' });
+    }
   }
 
   console.log(`\npeek opened (${host}) — ${TARGET} at ${PRESET}`);

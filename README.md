@@ -11,6 +11,8 @@ checks the result instead of asking you.
 
 No browser window. No emulator. Nothing to alt-tab to.
 
+![peek showing a landing page at desktop, laptop and phone sizes, then a markdown spec, then a live edit landing](docs/demo.gif)
+
 ```
 /peek
 ```
@@ -154,6 +156,10 @@ Focus the pane first — `alt`+arrow in most terminals, `prefix`+arrow in tmux.
 | `[` `]` | previous / next device |
 | `o` | rotate |
 | `r` | reload |
+| `e` | **page errors** — the footer shows a red count when the page throws; `e` lists them |
+| `d` | dark / light — flips `prefers-color-scheme` so you see both themes |
+| `+` `-` `0` | zoom in / out / reset |
+| `c` | copy the frame to the clipboard as an image |
 | `.` | pause refreshing |
 | `b` | cycle renderer |
 | `q` | quit and close the pane |
@@ -208,6 +214,8 @@ analogue-feeling input will be approximate.
 /peek --here                   run in this pane, don't split
 /peek --new                    force a second pane instead of reusing
 /peek --quit                   close the open pane cleanly
+/peek --compare desktop,iphone-15-pro   two panes side by side, one per preset (q closes each)
+/peek --doctor                 check Node, browser, driver, terminal and graphics, say what will work
 /peek --dry-run                print what it would do and stop
 ```
 
@@ -233,6 +241,24 @@ It drives a real browser, so it shows what a browser shows — and only that.
 - **Held keys** are approximated: each press is held 90 ms when focus isn't a
   text field, so WASD works, but there's no continuous held state. See Typing.
 
+## When something is wrong
+
+`peek --doctor` (or `/peek --doctor`) checks everything peek needs and says which renderer your terminal will get. Run it first if the pane looks like coloured noise or never opens.
+
+The pane also tells you when the page is unwell: a red `2 errors` in the footer means the page threw or logged `console.error` (press `e` to read them), and `page not responding` means the browser stopped answering, which usually means a tight loop in your code.
+
+## Status line
+
+`~/.peek/session.json` is plain JSON that any status line or prompt can read: `target` (what is shown), `preset`, `errors` (count on the current page) and `pid`. A one-liner for a shell prompt:
+
+```
+node -e "try{const s=require(require('os').homedir()+'/.peek/session.json');process.stdout.write('peek '+s.preset+(s.errors?' !'+s.errors:''))}catch{}"
+```
+
+## Tests
+
+`node test/run.mjs` runs the unit, launcher and browser tests. It needs no terminal multiplexer; the browser tests use whatever Chrome or Edge it finds and skip if there is none. The same suite runs on Windows and Linux in GitHub Actions on every push.
+
 ## What peek runs and fetches
 
 Everything peek does, so you can check it before installing:
@@ -244,6 +270,7 @@ Everything peek does, so you can check it before installing:
 - **Writes a little local state** to `~/.peek/`: which pane is open, and the folders you have previewed (`projects.json`). Delete the folder to clear it.
 - **Sends nothing anywhere.** No telemetry, no analytics, no account. The only outbound request peek makes itself is the one-time npm download above. The pages you preview make whatever requests they normally would.
 - **Has no hooks and no MCP server.** It adds one skill and one optional `peek` shell command.
+- **Clipboard, only when you press `c`.** Copying a frame uses PowerShell on Windows, `osascript` on macOS, and `wl-copy` or `xclip` on Linux. Nothing is read from the clipboard.
 
 ## How it works
 

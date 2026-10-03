@@ -70,6 +70,7 @@ const STATIC_FILE = arg('--file', null);
 // Write the frame being shown to this PNG on every repaint, so an agent can
 // look at the pane. Also requestable after the fact via the session file.
 const SNAPSHOT = arg('--snapshot', null);
+const WATCH_DIR = arg('--watch-dir', null);   // welcome page: switch when this folder gets content
 
 // -------------------------------------------------------------- presets ----
 function loadPresets() {
@@ -253,6 +254,10 @@ let caps = { sixel: false, kitty: false, tmux: false };
 let tickTimer = null;
 let lastShot = null;
 let statusMsg = 'starting';
+let errors = [];           // console errors and uncaught exceptions on the page
+let lastFrameAt = 0;       // when the browser last answered a screenshot
+let colorScheme = null;    // null = page default, 'dark' | 'light' when forced
+let zoom = 1;
 let lastStatus = null;
 let paused = false;
 // half-blocks until the terminal tells us it can do better - the old default
@@ -351,6 +356,32 @@ let myRev = 0;
 let snapshotDone = null;     // last snapshot path written, kept across publishes
 
 /** Publish what this pane is showing, so a new launch can find and reuse it. */
+/**
+ * The welcome page watches the folder it was opened from: the moment an
+ * index.html, .html or .md appears there, show it instead of the welcome.
+ */
+let watchTimer = null;
+function watchFolder(dir) {
+  if (watchTimer) clearInterval(watchTimer);
+  watchTimer = setInterval(async () => {
+    let names;
+    try { names = fs.readdirSync(dir); } catch { return; }
+    const file = names.find(n => /^index\.html$/i.test(n)) || names.find(n => /\.html?$/i.test(n))
+      || names.find(n => /^readme\.md$/i.test(n)) || names.find(n => /\.(md|markdown)$/i.test(n));
+    if (!file) return;
+    clearInterval(watchTimer); watchTimer = null;
+    try {
+      const { port } = await serveStatic({ root: dir, file: /^index\.html$/i.test(file) ? null : file });
+      currentTarget = `http://localhost:${port}/`;
+      shownDir = dir;
+      statusMsg = 'found ' + file;
+      await page.goto(currentTarget, { waitUntil: 'domcontentloaded', timeout: 30000 });
+      publish();
+      lastShot = null; dirty = true;
+    } catch (e) { statusMsg = '!' + (e.message || 'could not serve').slice(0, 40); }
+  }, 1500);
+}
+
 function publish(extra = {}) {
   session.write({
     pid: process.pid,
@@ -359,6 +390,7 @@ function publish(extra = {}) {
     preset: devices[deviceIdx]?.id,
     rev: myRev,
     snapshotDone,
+    errors: errors.length,
     ...extra,
   });
 }
@@ -429,6 +461,8 @@ async function applyControl(s) {
     await startDevServer(s.serve.script, s.serve.cwd, s.serve.port);
   }
   if (s.serve) publish({ serve: null });
+  if (s.watch) { watchFolder(s.watch); publish({ watch: null }); }
+  else if (watchTimer && s.static) { clearInterval(watchTimer); watchTimer = null; }
 
   if (s.target && s.target !== currentTarget) {
     currentTarget = s.target;
@@ -539,6 +573,8 @@ function drawHeader(L) {
     : `${v.width}x${v.height}  ${d.os}${landscape ? '  landscape' : ''}`;
 
   // drop the metadata before letting the header wrap
+  if (zoom !== 1) meta += `  ×${zoom}`;
+  if (colorScheme) meta += `  ${colorScheme}`;
   const budget = L.cols - label.length - 5;
   if (meta.length > budget) meta = budget > 1 ? meta.slice(0, budget - 1) + '…' : '';
 
@@ -576,17 +612,20 @@ function drawFooter(L) {
   const items = typing
     ? ['keys go to the page', 'esc to stop typing', 'ctrl+c quits']
     : [renderMode, 'i type', 'p project', 'space device', 'shift+? help', 'q quit'];
-  const order = typing ? [2, 1, 0] : [5, 4, 3, 2, 1, 0];   // most important first
+  if (!typing && errors.length) items.unshift(C.bad(`${errors.length} error${errors.length === 1 ? '' : 's'}  e`));
+  // most important first; the error badge, when present, is index 0 and wins
+  const order = typing ? [2, 1, 0] : errors.length ? [0, 6, 5, 4, 3, 2, 1] : [5, 4, 3, 2, 1, 0];
   let chosen = [];
   for (const i of order) {
     const next = [...chosen, i].sort((x, y) => x - y);
-    if (next.map(j => items[j]).join(sep).length > budget) break;
+    const visible = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
+    if (visible(next.map(j => items[j]).join(sep)).length > budget) break;
     chosen = next;
   }
   const hint = chosen.map(j => items[j]).join(sep);
 
   out(`${ESC}[?7l${ESC}[${L.rows};1H${ESC}[2K ${colour(plainState)}  ${C.dim(hint)}${ESC}[?7h`);
-  lastStatus = statusMsg + (paused ? ':p' : '') + renderMode + (typing ? ':t' : '');
+  lastStatus = statusMsg + (paused ? ':p' : '') + renderMode + (typing ? ':t' : '') + ':' + errors.length;
 }
 
 /** Rows for whichever list the picker is currently showing. */
@@ -775,7 +814,13 @@ async function tick(force = false) {
   if (lastLayout?.screenRect && !dirty) L.screenRect = lastLayout.screenRect;
   lastLayout = L;
   try {
-    const shot = await page.screenshot({ type: 'png' });
+    // A page stuck in a tight loop never answers the screenshot; without a
+    // timeout the pane would sit on the last good frame looking perfectly live.
+    const shot = await Promise.race([
+      page.screenshot({ type: 'png' }),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('page not responding')), 4000)),
+    ]);
+    lastFrameAt = Date.now();
     const changed = !lastShot || Buffer.compare(shot, lastShot) !== 0;
 
     if (changed || dirty) {
@@ -795,7 +840,7 @@ async function tick(force = false) {
     statusMsg = '!' + (e.message || 'screenshot failed').split('\n')[0].slice(0, 40);
     dirty = true;
   }
-  if (statusMsg + (paused ? ':p' : '') + renderMode !== lastStatus) drawFooter(L);
+  if (statusMsg + (paused ? ':p' : '') + renderMode + ':' + errors.length !== lastStatus) drawFooter(L);
 }
 
 // ----------------------------------------------------------- page input ----
@@ -818,7 +863,7 @@ function cellToPage(col, row) {
 }
 
 async function handleMouse(code, col, row, press) {
-  if (helpOpen) { if (press) { helpOpen = false; uncover(HELP.length + 2); await tick(true); } return; }
+  if (overlay) { if (press) { closeOverlay(); await tick(true); } return; }
   // menu takes precedence while it's open
   if (menuOpen) {
     const inMenu = menuBox && row >= menuBox.top && row < menuBox.top + menuBox.height
@@ -906,7 +951,38 @@ let lastMoveAt = 0;
 let lastClickAt = 0;
 let lastClickPt = { x: -99, y: -99 };
 
-let helpOpen = false;
+/** Re-apply zoom and the focus ring to whatever page is now loaded. */
+async function applyPageState() {
+  try {
+    await page.evaluate((z) => { document.documentElement.style.zoom = z === 1 ? '' : String(z); }, zoom);
+    // A keyboard user tabs between controls; without a ring there is no way to
+    // tell which one has focus from a screenshot. Only shows for keyboard focus.
+    await page.addStyleTag({ content: ':focus-visible{outline:3px solid #ff7cc8!important;outline-offset:2px!important}' });
+  } catch { /* mid-navigation */ }
+}
+
+/** Copy the current page frame to the system clipboard as an image. */
+async function copyFrame() {
+  if (!lastShot) return;
+  const tmp = path.join(os.tmpdir(), 'peek-clip.png');
+  fs.writeFileSync(tmp, lastShot);
+  const { spawnSync } = await import('node:child_process');
+  let r;
+  if (process.platform === 'win32') {
+    r = spawnSync('powershell', ['-NoProfile', '-STA', '-Command',
+      `Add-Type -AssemblyName System.Windows.Forms; $i=[System.Drawing.Image]::FromFile('${tmp}'); [System.Windows.Forms.Clipboard]::SetImage($i); $i.Dispose()`],
+      { windowsHide: true, encoding: 'utf8' });
+  } else if (process.platform === 'darwin') {
+    r = spawnSync('osascript', ['-e', `set the clipboard to (read (POSIX file "${tmp}") as «class PNGf»)`], { encoding: 'utf8' });
+  } else {
+    r = spawnSync('sh', ['-c', `wl-copy -t image/png < "${tmp}" 2>/dev/null || xclip -selection clipboard -t image/png -i "${tmp}"`], { encoding: 'utf8' });
+  }
+  statusMsg = r && r.status === 0 ? 'copied to clipboard' : '!could not copy (no clipboard tool)';
+  drawFooter(lastLayout || layout());
+}
+
+// One overlay at a time: the help table, or the error list.
+let overlay = null;        // { title, rows: [[left, right], ...] } | null
 let lastSpaceAt = 0;
 const HELP = [
   ['space',   'pick a device  (type to filter: "iph", "sam", "pixel")'],
@@ -916,20 +992,35 @@ const HELP = [
   ['i',       'type into the page  (esc to stop)'],
   ['r',       'reload'],
   ['.',       'pause / resume'],
+  ['e',       'show page errors'],
+  ['d',       'dark / light  (flips prefers-color-scheme)'],
+  ['+  -',    'zoom in / out  (0 resets)'],
+  ['c',       'copy the frame to the clipboard'],
   ['b',       'change renderer if the picture looks wrong'],
   ['shift+?', 'this help'],
   ['q',       'quit'],
   ['',        ''],
   ['mouse',   'click, drag, scroll and hover all go to the page'],
 ];
-function drawHelp(L) {
-  const width = Math.min(L.cols - 2, 62);
-  out(`${ESC}[2;2H${C.head(' peek keys '.padEnd(width))}`);
-  HELP.forEach(([k, d], i) => {
+function drawOverlay(L) {
+  if (!overlay) return;
+  const width = Math.min(L.cols - 2, 72);
+  out(`${ESC}[2;2H${C.head((' ' + overlay.title + ' ').padEnd(width))}`);
+  overlay.rows.forEach(([k, d], i) => {
     const line = `  ${k.padEnd(7)} ${d}`.padEnd(width).slice(0, width);
     out(`${ESC}[${3 + i};2H${ESC}[48;5;236m${ESC}[38;5;252m${line}${ESC}[0m`);
   });
-  out(`${ESC}[${3 + HELP.length};2H${ESC}[48;5;236m${ESC}[38;5;245m${'  any key to close'.padEnd(width)}${ESC}[0m`);
+  out(`${ESC}[${3 + overlay.rows.length};2H${ESC}[48;5;236m${ESC}[38;5;245m${'  any key to close'.padEnd(width)}${ESC}[0m`);
+}
+function openOverlay(title, rows) {
+  overlay = { title, rows };
+  drawOverlay(lastLayout || layout());
+}
+function closeOverlay() {
+  if (!overlay) return;
+  const n = overlay.rows.length + 2;
+  overlay = null;
+  uncover(n);
 }
 
 function openMenu(mode = 'preset') {
@@ -969,7 +1060,7 @@ function closeMenu() {
  */
 function uncover(rows = 0) {
   const L = lastLayout || layout();
-  const n = rows || (menuBox ? menuBox.height + 1 : 0) || HELP.length + 2;
+  const n = rows || (menuBox ? menuBox.height + 1 : 0) || 4;
   // Only rows below the image need wiping: the repaint covers the rest, and
   // erasing cells under a sixel shows as a black band until the next frame.
   const imgBottom = L.top + L.imgRows;
@@ -1225,6 +1316,23 @@ async function main() {
   const ctx = await browser.newContext({ viewport: vp(), deviceScaleFactor: 2 });
   page = await ctx.newPage();
 
+  // Errors are the first thing a user wants to know and the one thing a
+  // screenshot cannot show. Keep the last few; a navigation starts afresh.
+  const noteError = (text) => {
+    errors.push(String(text).split('\n')[0].slice(0, 200));
+    if (errors.length > 20) errors.shift();
+    drawFooter(lastLayout || layout());
+  };
+  page.on('pageerror', e => noteError(e.message || e));
+  // an uncaught exception also arrives as an "Uncaught ..." console entry;
+  // count it once, from pageerror
+  page.on('console', m => { if (m.type() === 'error' && !/^Uncaught /.test(m.text())) noteError(m.text()); });
+  page.on('framenavigated', f => {
+    if (f !== page.mainFrame()) return;
+    errors = [];
+    applyPageState();        // zoom and focus ring do not survive a navigation
+  });
+
   publish();            // claim the pane before anything slow happens, so a
                         // launch racing us reuses this one instead of splitting
   await ensureServer();
@@ -1238,6 +1346,8 @@ async function main() {
     statusMsg = '!no dev server at ' + currentTarget;
   }
   publish();          // the static server may have picked its own port
+
+  if (WATCH_DIR) watchFolder(WATCH_DIR);
 
   // one loop drives both the repaint and the shared-pane check
   tickTimer = setInterval(() => { tick(); checkControl(); }, INTERVAL);
@@ -1284,7 +1394,7 @@ async function main() {
     const k = ev.ch;
     if (ev.alt) return;                 // alt+letter is not one of our bindings
 
-    if (helpOpen) { helpOpen = false; uncover(HELP.length + 2); return tick(true); }
+    if (overlay) { closeOverlay(); return tick(true); }
 
     // while the device picker is open, letters narrow the list
     if (menuOpen && menuMode === 'preset' && k !== '\r' && k !== '\n' && k !== ESC && k !== ' ') {
@@ -1305,7 +1415,7 @@ async function main() {
     if (k === 'q') return shutdown();
     if (k === ESC) { if (menuOpen) { closeMenu(); await tick(true); } return; }
 
-    if (k === 'i') { typing = true; drawFooter(lastLayout || layout()); }
+    if (k === 'i') { typing = true; await applyPageState(); drawFooter(lastLayout || layout()); }
     else if (k === ']') { deviceIdx = (deviceIdx + 1) % devices.length; await applyViewport(); }
     else if (k === '[') { deviceIdx = (deviceIdx - 1 + devices.length) % devices.length; await applyViewport(); }
     else if (k === 'o' || k === 'l') { landscape = !landscape; await applyViewport(); }
@@ -1322,7 +1432,7 @@ async function main() {
       menuOpen ? closeMenu() : openMenu('preset');
       if (!menuOpen) await tick(true);
     }
-    else if (k === '?') { helpOpen = true; drawHelp(lastLayout || layout()); }
+    else if (k === '?') { openOverlay('peek keys', HELP); }
     else if (k === 'p') {
       // switch which project the pane is looking at, without restarting it
       if (menuOpen) closeMenu();
@@ -1339,6 +1449,23 @@ async function main() {
     else if (k === 'r') { lastShot = null; dirty = true; try { await page.reload({ waitUntil: 'domcontentloaded' }); } catch {} }
     else if (k === '.') { paused = !paused; drawFooter(lastLayout || layout()); }
     else if (k === 'b') { cycleRenderer(); }
+    else if (k === 'e') {
+      const rows = errors.length
+        ? errors.slice(-12).map((m, i) => [String(i + 1), m.slice(0, 64)])
+        : [['', 'no errors on this page']];
+      openOverlay(`page errors (${errors.length})`, rows);
+    }
+    else if (k === 'd') {
+      colorScheme = colorScheme === 'dark' ? 'light' : 'dark';
+      try { await page.emulateMedia({ colorScheme }); } catch {}
+      statusMsg = colorScheme; lastShot = null; await tick(true);
+    }
+    else if (k === '+' || k === '=' || k === '-' || k === '0') {
+      zoom = k === '0' ? 1 : Math.min(4, Math.max(0.25, +(zoom * (k === '-' ? 1 / 1.25 : 1.25)).toFixed(3)));
+      await applyPageState();
+      dirty = true; lastShot = null; await tick(true);
+    }
+    else if (k === 'c') { await copyFrame(); }
   }
 
   process.stdin.on('data', (chunk) => {

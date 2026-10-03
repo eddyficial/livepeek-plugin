@@ -102,6 +102,10 @@ Once it's focused:
 | `[` `]` | previous / next device |
 | `o` | rotate |
 | `r` | reload |
+| `e` | see the page's errors. A red count appears in the footer when something throws |
+| `d` | flip dark / light mode |
+| `+` `-` `0` | zoom in, out, reset |
+| `c` | copy what you see to the clipboard |
 | `.` | pause updating |
 | `b` | change renderer |
 | `q` | quit and close the pane |
@@ -130,6 +134,11 @@ Two things to know:
   like in a browser. If typing seems to do nothing, this is almost always why.
 
 ## If something looks wrong
+
+Start with `peek --doctor`. It checks Node, the browser, the driver, your
+terminal and its graphics support, and tells you which renderer you will get
+and why.
+
 
 **The view is coloured mush, or garbage characters.** `peek` guessed your
 terminal's graphics support wrong. Press `b` to cycle through the three
