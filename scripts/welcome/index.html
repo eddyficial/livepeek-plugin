@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>peek</title>
+<style>
+  :root { --bg:#0f1220; --card:#181c30; --text:#e8ebf7; --muted:#9aa3c7; --accent:#7c9cff; --accent2:#ff7cc8; }
+  * { box-sizing:border-box; margin:0; }
+  html, body { height:100%; }
+  body { font-family:system-ui,Segoe UI,sans-serif; background:var(--bg); color:var(--text); display:flex; align-items:center; justify-content:center; padding:32px; }
+  main { max-width:520px; width:100%; }
+  h1 { font-size:2.6rem; line-height:1.1; background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  p.lead { color:var(--muted); font-size:1.1rem; margin:14px 0 30px; }
+  ol { list-style:none; display:grid; gap:12px; }
+  li { background:var(--card); border-radius:14px; padding:16px 18px; display:flex; gap:14px; align-items:flex-start; }
+  li b { color:var(--accent); font-size:1.1rem; min-width:22px; }
+  li span { color:var(--muted); }
+  code { background:#0b0e1c; padding:2px 7px; border-radius:6px; color:var(--text); font-size:.95em; }
+  .keys { margin-top:28px; display:flex; flex-wrap:wrap; gap:8px 18px; color:var(--muted); font-size:.95rem; }
+  .keys kbd { background:#0b0e1c; border:1px solid #2a2f4a; border-bottom-width:3px; border-radius:6px; padding:2px 8px; color:var(--text); font-family:inherit; }
+  footer { margin-top:26px; color:#5d6690; font-size:.85rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>peek is ready</h1>
+  <p class="lead">This pane shows whatever you build, live, as you save. There is nothing to show in this folder yet.</p>
+  <ol>
+    <li><b>1</b><span>Ask Claude to build something: a website, a game, a phone app, a document. Or create an <code>index.html</code> here yourself.</span></li>
+    <li><b>2</b><span>Save. This pane updates on its own a moment later.</span></li>
+    <li><b>3</b><span>Click, scroll and hover with your mouse. Press <kbd>i</kbd> to type into the page.</span></li>
+  </ol>
+  <div class="keys">
+    <span><kbd>space</kbd> device</span>
+    <span><kbd>p</kbd> project</span>
+    <span><kbd>shift</kbd>+<kbd>?</kbd> all keys</span>
+    <span><kbd>q</kbd> quit</span>
+  </div>
+  <footer>Have a project elsewhere? Run <code>/peek</code> from that folder and this pane will switch to it.</footer>
+</main>
+</body>
+</html>
