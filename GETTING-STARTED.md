@@ -90,7 +90,8 @@ The VS Code terminal cannot be split from the outside, so `/peek` there
 prints instructions instead of a pane. Follow them: split the terminal by
 hand (Ctrl+Shift+5, or Cmd+\ on a Mac) and run `peek --here` in the new
 half. To see the real picture instead of text, enable the setting
-`terminal.integrated.enableImages` and restart the terminal.
+`terminal.integrated.enableImages` and reload the window (Developer: Reload
+Window). A new terminal alone is not enough.
 
 ## Driving it
 
