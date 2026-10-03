@@ -5,6 +5,7 @@
   "author": {
     "name": "eddyficial"
   },
+  "icon": "./.claude-plugin/icon.png",
   "homepage": "https://github.com/eddyficial/peek",
   "repository": "https://github.com/eddyficial/peek",
   "documentationUrl": "https://github.com/eddyficial/peek/blob/main/GETTING-STARTED.md",
