@@ -1326,7 +1326,12 @@ async function main() {
   page.on('pageerror', e => noteError(e.message || e));
   // an uncaught exception also arrives as an "Uncaught ..." console entry;
   // count it once, from pageerror
-  page.on('console', m => { if (m.type() === 'error' && !/^Uncaught /.test(m.text())) noteError(m.text()); });
+  page.on('console', m => {
+    if (m.type() !== 'error' || /^Uncaught /.test(m.text())) return;
+    // a missing favicon is not the user's bug, whatever server is behind it
+    if (/favicon\.ico$/.test(m.location()?.url || '')) return;
+    noteError(m.text());
+  });
   page.on('framenavigated', f => {
     if (f !== page.mainFrame()) return;
     errors = [];

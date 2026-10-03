@@ -129,6 +129,11 @@ export function serveStatic({ root, file = null, port = 0 }) {
   root = path.resolve(root);
   const server = http.createServer((req, res) => {
     const url = new URL(req.url, 'http://x');
+    // Browsers ask for this on every page. A 404 here shows up as a console
+    // error, which would put a red badge on a page that has nothing wrong.
+    if (url.pathname === '/favicon.ico' && !fs.existsSync(path.join(root, 'favicon.ico'))) {
+      res.writeHead(204); return res.end();
+    }
     if (url.pathname === '/__peek/stamp') {
       res.writeHead(200, { 'content-type': 'text/plain', 'cache-control': 'no-store' });
       return res.end(stamp(root));
