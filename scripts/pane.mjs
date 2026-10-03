@@ -296,6 +296,9 @@ async function main() {
     session.write({
       ...open,
       target: STATIC ? null : TARGET,
+      // a dev-server project: the open pane has to start its server, or the
+      // page it navigates to is empty (or someone else's)
+      serve: serveArgs[0] === '--serve' ? { script: fw.script, cwd: root, port: PORT } : null,
       static: STATIC ? STATIC.dir : null,
       file: STATIC ? STATIC.file : null,
       preset: PRESET,

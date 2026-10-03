@@ -425,6 +425,11 @@ async function applyControl(s) {
     publish({ static: null, file: null });
   }
 
+  if (s.serve && s.serve.port && !(await portOpen(s.serve.port))) {
+    await startDevServer(s.serve.script, s.serve.cwd, s.serve.port);
+  }
+  if (s.serve) publish({ serve: null });
+
   if (s.target && s.target !== currentTarget) {
     currentTarget = s.target;
     statusMsg = 'loading';
