@@ -212,11 +212,8 @@ pane or a smaller viewport:
 | anything else | — | pass `--url` or `--file` |
 
 33 viewports ship with it — 21 real devices, 6 web breakpoints, 5 game aspect
-ratios, 2 document pages. See them all:
-
-```bash
-node "$CLAUDE_PLUGIN_ROOT/scripts/tui.mjs" --list
-```
+ratios, 2 document pages. Press `space` in the pane to see them all, and type
+to filter the list.
 
 ## Options
 
