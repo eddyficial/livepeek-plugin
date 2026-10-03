@@ -182,7 +182,11 @@ async function installDriver() {
   statusMsg = 'first run: fetching browser driver (~3 MB, once)';
   drawFooter(lastLayout || layout());
   const { spawnSync } = await import('node:child_process');
-  const r = spawnSync('npm', ['install', '--prefix', __dirname, '--no-fund', '--no-audit', '--no-save',
+  // shell: true joins argv into one command line unquoted, so a plugin folder
+  // with a space in it would split in two. Double quotes work in cmd and sh.
+  // Plain quotes rather than JSON.stringify, which would double every
+  // backslash in a Windows path.
+  const r = spawnSync('npm', ['install', '--prefix', '"' + __dirname + '"', '--no-fund', '--no-audit', '--no-save',
     '--silent', 'playwright-core@1.63.0'], { cwd: __dirname, shell: true, windowsHide: true, encoding: 'utf8' });
   if (r.status !== 0) {
     throw new Error(
@@ -329,12 +333,28 @@ async function ensureServer() {
   if (STATIC_DIR) {
     statusMsg = 'serving ' + path.basename(STATIC_DIR);
     drawFooter(lastLayout || layout());
-    const { port } = await serveStatic({ root: STATIC_DIR, file: STATIC_FILE, port: SERVE_PORT || 0 });
+    const { port } = await serveFolder({ root: STATIC_DIR, file: STATIC_FILE, port: SERVE_PORT || 0 });
     currentTarget = `http://localhost:${port}/`;
     return;
   }
   if (!SERVE || !SERVE_PORT || await portOpen(SERVE_PORT)) return;
   await startDevServer(SERVE, SERVE_CWD, SERVE_PORT);
+}
+
+/**
+ * Serve a folder, and stop serving the one before it.
+ *
+ * Every switch to a document or folder starts a server; without this the old
+ * ones stay listening for as long as the pane is open, each still exposing
+ * its folder on localhost. The old one is closed only once the new one is up,
+ * so a failed switch leaves the current view working.
+ */
+let staticServer = null;
+async function serveFolder(opts) {
+  const r = await serveStatic(opts);
+  try { staticServer?.close(); } catch { /* already closed */ }
+  staticServer = r.server;
+  return r;
 }
 
 /** Run `npm run <script>` in cwd and wait for its port. Resolves true when up. */
@@ -375,7 +395,7 @@ function watchFolder(dir) {
     if (!file) return;
     clearInterval(watchTimer); watchTimer = null;
     try {
-      const { port } = await serveStatic({ root: dir, file: /^index\.html$/i.test(file) ? null : file });
+      const { port } = await serveFolder({ root: dir, file: /^index\.html$/i.test(file) ? null : file });
       currentTarget = `http://localhost:${port}/`;
       shownDir = dir;
       statusMsg = 'found ' + file;
@@ -400,6 +420,19 @@ function publish(extra = {}) {
 }
 
 /**
+ * Publish, unless a launcher has written a request this pane has not picked
+ * up yet. publish() rewrites the whole file, so an unprompted one - a page
+ * error, a navigation - landing between a launcher's write and the next tick
+ * would silently throw that request away. The request's own handling
+ * publishes the fresh state shortly after.
+ */
+function publishIfIdle() {
+  const s = session.read();
+  if (s && s.pid === process.pid && s.rev !== myRev) return;
+  publish();
+}
+
+/**
  * Has another launch asked this pane to do something?
  *
  * Checked on the render tick rather than with a watcher: the tick is already
@@ -407,6 +440,9 @@ function publish(extra = {}) {
  * is imperceptible.
  */
 async function checkControl() {
+  // One request at a time. A retarget can sit in startDevServer for a minute
+  // and a half; a newer request waits for the next tick after it finishes.
+  if (controlBusy) return;
   const s = session.read();
   if (!s || s.pid !== process.pid || s.rev === myRev) return;
 
@@ -435,14 +471,21 @@ async function applyControl(s) {
     if (!s.snapshot && s.target === currentTarget && s.preset === devices[deviceIdx]?.id && !s.static) return;
   }
 
-  // a one-off "show me what you're showing" from outside
-  if (s.snapshot) {
+  // a one-off "show me what you're showing" from outside. The previous
+  // snapshotDone is forgotten first: the launcher waits for it to name this
+  // file, and a retarget publishes several times before the snapshot is taken.
+  if (s.snapshot) snapshotDone = null;
+  const takeSnapshot = async () => {
     await tick(true);
     writeSnapshot(s.snapshot);
     snapshotDone = s.snapshot;
     publish({ snapshot: null });
-    // a bare snapshot request changes nothing else about the view
-    if (s.target === currentTarget && s.preset === devices[deviceIdx]?.id && !s.static) return;
+  };
+  // A bare snapshot request changes nothing else about the view, so take it
+  // now. One that came with a retarget waits until the end: taken here it
+  // would show the page being navigated away from.
+  if (s.snapshot && s.target === currentTarget && s.preset === devices[deviceIdx]?.id && !s.static && !s.serve) {
+    return takeSnapshot();
   }
 
   if (s.preset) {
@@ -453,7 +496,7 @@ async function applyControl(s) {
   // retargeted at a folder or document rather than a server: serve it here
   if (s.static) {
     try {
-      const { port } = await serveStatic({ root: s.static, file: s.file || null });
+      const { port } = await serveFolder({ root: s.static, file: s.file || null });
       s.target = `http://localhost:${port}/`;
     } catch (e) {
       statusMsg = '!' + (e.message || 'could not serve').slice(0, 40);
@@ -466,7 +509,13 @@ async function applyControl(s) {
   }
   if (s.serve) publish({ serve: null });
   if (s.watch) { watchFolder(s.watch); publish({ watch: null }); }
-  else if (watchTimer && s.static) { clearInterval(watchTimer); watchTimer = null; }
+  // the user has moved on to something real: stop waiting for the welcome
+  // folder, or it would yank the view back the moment a file lands there
+  // (s.target is always present - every request carries the last published
+  // one - so only a different target counts as moving on)
+  else if (watchTimer && ((s.target && s.target !== currentTarget) || s.static || s.serve)) {
+    clearInterval(watchTimer); watchTimer = null;
+  }
 
   if (s.target && s.target !== currentTarget) {
     currentTarget = s.target;
@@ -481,6 +530,7 @@ async function applyControl(s) {
   }
 
   await applyViewport();
+  if (s.snapshot) await takeSnapshot();
 }
 
 /** Everything currently listening, probed in parallel so this stays snappy. */
@@ -708,6 +758,8 @@ async function menuSelect(pos) {
   if (!item) { closeMenu(); return tick(true); }
   const idx = item.idx;
   if (menuMode === 'target') {
+    // a project picked by hand replaces the welcome page for good
+    if (watchTimer) { clearInterval(watchTimer); watchTimer = null; }
     const t = targets[idx];
     closeMenu();
     if (!t) return tick(true);
@@ -717,7 +769,7 @@ async function menuSelect(pos) {
       statusMsg = 'serving ' + path.basename(t.dir);
       drawFooter(lastLayout || layout());
       try {
-        const { port } = await serveStatic({ root: t.dir, file: t.file || null });
+        const { port } = await serveFolder({ root: t.dir, file: t.file || null });
         currentTarget = `http://localhost:${port}/`;
         shownDir = t.dir;
       } catch (e) {
@@ -837,12 +889,42 @@ let lastComposed = null;
  *  frame, so text is legible when an agent reads it back. */
 function writeSnapshot(file) {
   try {
+    fs.mkdirSync(path.dirname(file), { recursive: true });   // e.g. .peek/ on first use
     if (lastShot) fs.writeFileSync(file, lastShot);          // page screenshot, full res
     else if (lastComposed) fs.writeFileSync(file, encodePng(lastComposed));
   } catch { /* a snapshot is never worth crashing the view */ }
 }
 
+/**
+ * Prove this pane is alive: touch the heartbeat file, at most every 2 s.
+ * session.current() treats a pane whose heartbeat is older than 10 s as gone,
+ * whatever its pid says. Runs before any of tick's early returns, so a
+ * paused or busy pane still counts as open.
+ */
+let lastBeat = 0;
+let startBeat = null;        // beats while main() is still starting up
+function beat() {
+  const now = Date.now();
+  if (now - lastBeat < 2000) return;
+  lastBeat = now;
+  try { const t = new Date(now); fs.utimesSync(session.BEAT, t, t); }
+  catch { try { fs.writeFileSync(session.BEAT, ''); } catch { /* not worth failing over */ } }
+}
+
+// The timer fires every INTERVAL ms whether or not the last frame has
+// finished; a slow screenshot would otherwise stack ticks up behind it.
+// Forced ticks (input, control requests) still go through. A count rather
+// than a flag, so a forced tick finishing does not clear it for a slow one
+// still in flight.
+let ticking = 0;
 async function tick(force = false) {
+  beat();
+  if (ticking && !force) return;
+  ticking++;
+  try { await paint(force); } finally { ticking--; }
+}
+
+async function paint(force) {
   if (!page || (paused && !force) || (controlBusy && !force)) return;
   const L = layout();
   // The screen rect is only computed when a frame is painted. A static page
@@ -1035,19 +1117,25 @@ async function applyPageState() {
 /** Copy the current page frame to the system clipboard as an image. */
 async function copyFrame() {
   if (!lastShot) return;
-  const tmp = path.join(os.tmpdir(), 'peek-clip.png');
+  // A private folder rather than a fixed name in the shared temp dir, which
+  // another user or process could have planted something at.
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'peek-'));
+  const tmp = path.join(dir, 'clip.png');
   fs.writeFileSync(tmp, lastShot);
   const { spawnSync } = await import('node:child_process');
   let r;
   if (process.platform === 'win32') {
+    // inside a PowerShell single-quoted string, a quote is written twice
+    const lit = tmp.replace(/'/g, "''");
     r = spawnSync('powershell', ['-NoProfile', '-STA', '-Command',
-      `Add-Type -AssemblyName System.Windows.Forms; $i=[System.Drawing.Image]::FromFile('${tmp}'); [System.Windows.Forms.Clipboard]::SetImage($i); $i.Dispose()`],
+      `Add-Type -AssemblyName System.Windows.Forms; $i=[System.Drawing.Image]::FromFile('${lit}'); [System.Windows.Forms.Clipboard]::SetImage($i); $i.Dispose()`],
       { windowsHide: true, encoding: 'utf8' });
   } else if (process.platform === 'darwin') {
     r = spawnSync('osascript', ['-e', `set the clipboard to (read (POSIX file "${tmp}") as «class PNGf»)`], { encoding: 'utf8' });
   } else {
     r = spawnSync('sh', ['-c', `wl-copy -t image/png < "${tmp}" 2>/dev/null || xclip -selection clipboard -t image/png -i "${tmp}"`], { encoding: 'utf8' });
   }
+  try { fs.rmSync(dir, { recursive: true, force: true }); } catch { /* the OS cleans temp eventually */ }
   statusMsg = r && r.status === 0 ? 'copied to clipboard' : '!could not copy (no clipboard tool)';
   drawFooter(lastLayout || layout());
 }
@@ -1341,10 +1429,12 @@ const enqueue = (events, dispatch) => {
 
 // ----------------------------------------------------------------- main ----
 async function applyViewport() {
-  await page.setViewportSize(vp());
-  // Chrome occasionally reports the old innerWidth for a beat after a resize
-  // that coincides with a navigation; ask, and resize again if it disagrees.
+  // Inside the try too: a resize landing mid-navigation, or after the browser
+  // has gone, throws here, and nothing upstream of a resize event catches it.
   try {
+    await page.setViewportSize(vp());
+    // Chrome occasionally reports the old innerWidth for a beat after a resize
+    // that coincides with a navigation; ask, and resize again if it disagrees.
     const want = vp();
     const got = await page.evaluate(() => [innerWidth, innerHeight]);
     if (got[0] !== want.width || got[1] !== want.height) {
@@ -1359,6 +1449,14 @@ async function applyViewport() {
 }
 
 async function main() {
+  // Heartbeat from the first moment, not the first tick: installing the
+  // driver, launching the browser and starting a dev server can each take
+  // longer than the 10 s after which a launcher decides this pane is dead.
+  try { fs.mkdirSync(path.dirname(session.BEAT), { recursive: true }); fs.writeFileSync(session.BEAT, ''); }
+  catch { /* not worth failing over */ }
+  lastBeat = Date.now();
+  startBeat = setInterval(beat, 2000);
+
   out(`${ESC}[?1049h${ESC}[?25l`);          // alt screen, hide cursor
   if (process.stdin.isTTY) process.stdin.setRawMode(true);
   process.stdin.resume();
@@ -1390,10 +1488,15 @@ async function main() {
 
   // Errors are the first thing a user wants to know and the one thing a
   // screenshot cannot show. Keep the last few; a navigation starts afresh.
+  // The count is published too, so an agent reading the session file sees it.
+  // A page that logs in a loop would rewrite that file hundreds of times a
+  // second, so publishing is batched: at most once per 500 ms, once at the end.
+  let errorPublish = null;
   const noteError = (text) => {
     errors.push(String(text).split('\n')[0].slice(0, 200));
     if (errors.length > 20) errors.shift();
     drawFooter(lastLayout || layout());
+    if (!errorPublish) errorPublish = setTimeout(() => { errorPublish = null; publishIfIdle(); }, 500);
   };
   page.on('pageerror', e => noteError(e.message || e));
   // an uncaught exception also arrives as an "Uncaught ..." console entry;
@@ -1407,6 +1510,7 @@ async function main() {
   page.on('framenavigated', f => {
     if (f !== page.mainFrame()) return;
     errors = [];
+    publishIfIdle();         // the count on file starts afresh too
     lastTextKey = ''; textScroll = 0;
     applyPageState();        // zoom and focus ring do not survive a navigation
   });
@@ -1429,9 +1533,17 @@ async function main() {
 
   // one loop drives both the repaint and the shared-pane check
   tickTimer = setInterval(() => { tick(); checkControl(); }, INTERVAL);
+  clearInterval(startBeat);       // tick keeps the heartbeat from here on
+  // Dragging a pane border fires resize dozens of times; only the size it
+  // settles on is worth a viewport change. A failure here has nobody above it
+  // to catch it, so it is dropped - the next resize or tick tries again.
+  let resizeTimer = null;
   process.stdout.on('resize', () => {
     dirty = true; lastShot = null;
-    if (devices[deviceIdx]?.fit) applyViewport();   // re-render at the new pane size
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(() => {
+      if (devices[deviceIdx]?.fit) applyViewport().catch(() => {});   // re-render at the new pane size
+    }, 120);
   });
 
   /** Route one event to the page or to the viewer, depending on mode. */
@@ -1547,6 +1659,11 @@ async function main() {
   }
 
   process.stdin.on('data', (chunk) => {
+    // ctrl+c skips the queue. Events are handled one at a time, and one of
+    // them can be waiting up to 90 s for a dev server to come up - a ctrl+c
+    // queued behind it would look like the pane ignoring the user.
+    if (chunk.includes(0x03)) return shutdown();
+
     if (escTimer) { clearTimeout(escTimer); escTimer = null; }
 
     enqueue(parseInput(chunk), dispatch);
@@ -1564,12 +1681,29 @@ async function main() {
   });
 }
 
-function shutdown() {
-  if (tickTimer) clearInterval(tickTimer);
-  session.clear();              // stop advertising a pane that is going away
+/**
+ * Stop advertising this pane - but only if the session file is still ours.
+ * With --compare two panes run at once and the newer one owns the file;
+ * quitting the older one must not make the newer one look closed.
+ */
+function releaseSession() {
+  // a launcher's claim (no pid yet) is cleared too: it was for this pane, and
+  // left behind it would make the next launch wait for a pane that never comes
+  const s = session.read();
+  if (s && (s.pid === process.pid || s.claiming)) session.clear();   // also removes the heartbeat
+}
+
+/** Put the terminal back the way it was found. Safe to call more than once. */
+function restore() {
   out(`${ESC}[?1003l${ESC}[?1006l${ESC}[?1002l${ESC}[?1000l`);  // mouse off
   out(`${ESC}[?25h${ESC}[?1049l`);                              // cursor, main screen
-  if (process.stdin.isTTY) process.stdin.setRawMode(false);
+  try { if (process.stdin.isTTY) process.stdin.setRawMode(false); } catch { /* stdin already gone */ }
+}
+
+function shutdown() {
+  if (tickTimer) clearInterval(tickTimer);
+  releaseSession();             // stop advertising a pane that is going away
+  restore();
   browser?.close().catch(() => {});
   process.exit(0);
 }
@@ -1577,9 +1711,25 @@ function shutdown() {
 process.on('SIGINT', () => shutdown());
 process.on('SIGTERM', () => shutdown());
 
+// A last resort for anything that slips past the handlers above - an event
+// callback that throws, a promise nobody awaited. Without it the process dies
+// with the terminal still in raw mode, on the alternate screen, with mouse
+// reporting on: the user's shell is left unusable, and the headless browser
+// is orphaned.
+const crash = (e) => {
+  restore();
+  try { releaseSession(); } catch { /* exiting anyway */ }
+  try { browser?.close().catch(() => {}); } catch { /* exiting anyway */ }
+  console.error(e);
+  process.exit(1);
+};
+process.on('uncaughtException', crash);
+process.on('unhandledRejection', crash);
+
 main().catch((e) => {
+  clearInterval(startBeat);
   out(`${ESC}[?1003l${ESC}[?1006l${ESC}[?1002l${ESC}[?1000l${ESC}[?25h${ESC}[?1049l`);
-  session.clear();
+  releaseSession();
   console.error('\npeek could not start:\n\n' + (e.message || e) + '\n');
   // Exit 0 after a keypress rather than 1 immediately. A non-zero exit makes
   // the terminal keep this pane open as a corpse; a zero exit on a key gives

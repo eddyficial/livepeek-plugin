@@ -25,14 +25,25 @@ const TYPES = {
 
 const RELOAD = `<script>(()=>{let s=null;setInterval(async()=>{try{const r=await fetch('/__peek/stamp',{cache:'no-store'});const t=await r.text();if(s!==null&&t!==s)location.reload();s=t}catch{}},500)})()</script>`;
 
+// The page polls the stamp twice a second, and a served folder can be large -
+// a document opened from the home folder serves the whole of it. So the walk
+// is cached briefly and stops after a fixed number of entries rather than
+// grinding through everything on every poll.
+const STAMP_TTL = 400;
+const STAMP_MAX = 5000;
+let lastStamp = null, stampAt = 0, stampRoot = null;
+
 /** Newest mtime under root, as a string. Skips node_modules and dot dirs. */
 function stamp(root) {
+  if (stampRoot === root && Date.now() - stampAt < STAMP_TTL) return lastStamp;
   let newest = 0;
+  let seen = 0;
   const walk = (dir, depth) => {
-    if (depth > 6) return;
+    if (depth > 6 || seen > STAMP_MAX) return;
     let entries;
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
     for (const e of entries) {
+      if (++seen > STAMP_MAX) return;
       if (e.name === 'node_modules' || e.name.startsWith('.')) continue;
       const p = path.join(dir, e.name);
       if (e.isDirectory()) walk(p, depth + 1);
@@ -42,10 +53,35 @@ function stamp(root) {
     }
   };
   walk(root, 0);
-  return String(Math.floor(newest));
+  lastStamp = String(Math.floor(newest));
+  stampAt = Date.now();
+  stampRoot = root;
+  return lastStamp;
 }
 
-const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+
+/**
+ * Only let a markdown link or image point somewhere harmless: the web, mail,
+ * an anchor, or a path inside the served folder. Anything else with a scheme -
+ * javascript:, data:, vbscript: - becomes a dead '#' link, because a document
+ * is rendered on a real origin and a click on it would run in that page.
+ *
+ * The URL arrives already escaped (inline() escapes first), so &amp; and
+ * friends are just characters here and stay escaped in the attribute.
+ */
+function safeUrl(u) {
+  u = u.trim();
+  if (/^(https?:|mailto:)/i.test(u)) return u;
+  if (/^(#|\/|\.\/|\.\.\/)/.test(u)) return u;
+  const colon = u.indexOf(':');
+  // a colon with no slash before it starts a scheme; a colon later on is
+  // just part of a relative path or a query string
+  if (colon !== -1 && !u.slice(0, colon).includes('/')) return '#';
+  if (/^[\w.-]/.test(u)) return u;
+  return '#';
+}
 
 /**
  * Markdown to HTML - enough for documents: headings, paragraphs, lists,
@@ -58,8 +94,8 @@ export function renderMarkdown(md) {
   let i = 0;
   const inline = (s) => esc(s)
     .replace(/`([^`]+)`/g, '<code>$1</code>')
-    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img alt="$1" src="$2">')
-    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2">$1</a>')
+    .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, src) => `<img alt="${alt}" src="${safeUrl(src)}">`)
+    .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_, text, href) => `<a href="${safeUrl(href)}">${text}</a>`)
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>');
   const BLOCK = /^(#|```|>|\s*[-*+]\s|\s*\d+[.)]\s|\|)/;
@@ -128,6 +164,16 @@ function wrapDoc(title, body) {
 export function serveStatic({ root, file = null, port = 0 }) {
   root = path.resolve(root);
   const server = http.createServer((req, res) => {
+    // Anything that throws in here - a file deleted between stat and read, a
+    // folder that cannot be listed - answers 500 rather than crashing the
+    // pane that hosts the server. The message stays out of the response.
+    try { handle(req, res); }
+    catch {
+      if (!res.headersSent) res.writeHead(500);
+      res.end('error');
+    }
+  });
+  function handle(req, res) {
     const url = new URL(req.url, 'http://x');
     // Browsers ask for this on every page. A 404 here shows up as a console
     // error, which would put a red badge on a page that has nothing wrong.
@@ -141,11 +187,14 @@ export function serveStatic({ root, file = null, port = 0 }) {
     let target;
     if (url.pathname === '/' && file) target = path.resolve(root, file);
     else {
-      const rel = decodeURIComponent(url.pathname).replace(/^\/+/, '');
-      target = path.resolve(root, rel || '.');
+      // a bad percent-escape throws; it must not take the whole pane down
+      let rel;
+      try { rel = decodeURIComponent(url.pathname); } catch { res.writeHead(400); return res.end('bad path'); }
+      target = path.resolve(root, rel.replace(/^\/+/, '') || '.');
     }
-    // never escape the root
-    if (!target.startsWith(root)) { res.writeHead(403); return res.end('forbidden'); }
+    // Never escape the root. A plain prefix test is not enough: "/proj" is
+    // a prefix of "/proj2", so the check is root itself or root + separator.
+    if (target !== root && !target.startsWith(root + path.sep)) { res.writeHead(403); return res.end('forbidden'); }
 
     let st;
     try { st = fs.statSync(target); } catch { res.writeHead(404); return res.end('not found: ' + url.pathname); }
@@ -173,8 +222,10 @@ export function serveStatic({ root, file = null, port = 0 }) {
       return res.end(html);
     }
     res.writeHead(200, { 'content-type': TYPES[ext] || 'application/octet-stream' });
-    fs.createReadStream(target).pipe(res);
-  });
+    fs.createReadStream(target)
+      .on('error', () => { if (!res.headersSent) res.writeHead(500); res.end(); })
+      .pipe(res);
+  }
   return new Promise((resolve, reject) => {
     server.on('error', reject);
     server.listen(port, '127.0.0.1', () => resolve({ server, port: server.address().port }));

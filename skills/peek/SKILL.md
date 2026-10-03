@@ -59,10 +59,12 @@ can. After you edit a screen, a level, a page or a document, do not ask the
 user whether it looks right - check:
 
 ```bash
-node "${CLAUDE_PLUGIN_ROOT}/scripts/pane.mjs" --snapshot /tmp/peek.png
+node "${CLAUDE_PLUGIN_ROOT}/scripts/pane.mjs" --snapshot .peek/snapshot.png
 ```
 
-then read the PNG with the Read tool. It is the page at full resolution (the
+then read the PNG with the Read tool. The path is relative to the project and
+peek creates the `.peek` folder if it is missing; `/tmp` does not exist on
+Windows, so do not reach for it. It is the page at full resolution (the
 same thing the pane is painting), so text is legible. Wait a couple of seconds
 after saving a file first; the dev server or the built-in reloader needs a
 moment to pick the change up.

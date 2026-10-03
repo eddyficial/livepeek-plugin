@@ -116,6 +116,16 @@ if (!URL_ARG && !fw && !STATIC) {
   if (!quiet) console.log('Or name a file or URL:  --file docs/spec.md   --url http://localhost:3000\n');
 }
 
+// The static server serves the whole folder a file sits in, not just the
+// file. For `--file ~/notes.md` that folder is the home directory, and all of
+// it becomes readable on localhost while the pane is open. Allowed, but said.
+const samePath = (a, b) => process.platform === 'win32'
+  ? path.resolve(a).toLowerCase() === path.resolve(b).toLowerCase()
+  : path.resolve(a) === path.resolve(b);
+if (STATIC && !welcome && samePath(STATIC.dir, os.homedir())) {
+  console.error('warning: this serves your whole home folder on localhost while the pane is open - move the file into a project folder to serve only that.');
+}
+
 if (fw && fw.missing?.length && !URL_ARG) {
   console.error(`This project is missing: ${fw.missing.join(', ')}`);
   console.error(`\nThese are needed for the web build the preview renders.\n\nInstall with:\n  ${fw.install}\n`);
@@ -175,9 +185,11 @@ const previewCmd = [
   ...(SNAPSHOT ? ['--snapshot', path.resolve(SNAPSHOT)] : []),
 ];
 
-// quote for the multiplexers that take a shell string rather than argv
-const shellQuote = (parts) =>
-  parts.map(p => (/[\s"]/.test(p) ? `"${p.replace(/"/g, '\\"')}"` : p)).join(' ');
+// Quote for the multiplexers that take a shell string rather than argv (tmux
+// hands it to sh). Single quotes, because inside them sh expands nothing - a
+// folder called "a;b", "$(x)" or "it's" stays a name instead of becoming a
+// command. A single quote itself is closed, escaped and reopened: ' -> '\''
+const shellQuote = (parts) => parts.map(p => "'" + String(p).replace(/'/g, "'\\''") + "'").join(' ');
 
 /**
  * Which multiplexer is hosting us?
@@ -236,11 +248,14 @@ const splitters = {
     '--title', 'peek',
     '-d', paneCwd,
     ...previewCmd,
-  ]],
+  // wt documents backslash-semicolon as the escape, so a project folder or
+  // file called "a; b" does not get split into a second command
+  ].map(a => a.replace(/;/g, String.fromCharCode(92) + ';'))],
 };
 
 async function main() {
   let open = session.current();
+  let weHoldClaim = false;
 
   // --quit closes the pane cleanly from outside. Killing the process instead
   // makes it exit non-zero, and Windows Terminal keeps a pane open on an
@@ -271,9 +286,8 @@ async function main() {
   if (SNAPSHOT && !open && argv.length <= 2) {
     die('no peek pane is open to snapshot. Run peek first, then --snapshot.');
   }
-  if (SNAPSHOT && open && !flag('--new') && argv.length <= 2) {
-    const file = path.resolve(SNAPSHOT);
-    session.write({ ...open, snapshot: file, snapshotDone: null, rev: (open.rev || 0) + 1 });
+  /** Wait for the open pane to report the snapshot asked for. */
+  const awaitSnapshot = async (file) => {
     const deadline = Date.now() + 8000;
     while (Date.now() < deadline) {
       await new Promise(r => setTimeout(r, 150));
@@ -282,6 +296,11 @@ async function main() {
       }
     }
     die('the pane did not answer within 8s - is it still running?');
+  };
+  if (SNAPSHOT && open && !flag('--new') && argv.length <= 2) {
+    const file = path.resolve(SNAPSHOT);
+    session.write({ ...open, snapshot: file, snapshotDone: null, rev: (open.rev || 0) + 1 });
+    return awaitSnapshot(file);
   }
 
   // One pane, retargeted. Splitting again for every project would stack up
@@ -290,6 +309,18 @@ async function main() {
   // user has since moved into Zellij) cannot be reused from here: retargeting
   // it would change a view the user is no longer looking at. Close it and
   // split a fresh one in the terminal they are in now.
+  // Two launches in the same second (two shells, or Claude and the user)
+  // would each see no pane and both split. A launcher claims the session
+  // file before it splits; a second launcher that finds a fresh claim waits
+  // for that pane to come up and reuses it.
+  if (!open && !flag('--new') && !flag('--here') && !flag('--dry-run') && !session.claim()) {
+    // another launcher is splitting right now: wait for its pane, then reuse
+    const until = Date.now() + 20000;
+    while (Date.now() < until && !session.current()) Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 150);
+  } else if (!open && !flag('--new') && !flag('--here') && !flag('--dry-run')) {
+    weHoldClaim = true;
+  }
+
   open = session.current();
   if (open && open.host && open.host !== (detectHost() || 'none') && !flag('--here') && !flag('--dry-run')) {
     console.log(`closing the pane left open in ${open.host}`);
@@ -312,11 +343,15 @@ async function main() {
       file: STATIC ? STATIC.file : null,
       preset: PRESET,
       snapshot: SNAPSHOT ? path.resolve(SNAPSHOT) : null,
+      snapshotDone: SNAPSHOT ? null : open.snapshotDone,
       rev: (open.rev || 0) + 1,
     });
     const what = STATIC ? `${STATIC.file || 'index.html'} in ${STATIC.dir}` : TARGET;
     console.log(`reusing the open pane — ${what} at ${PRESET}`);
     console.log('  (--new splits a second pane instead)');
+    // a retarget that also asked for a snapshot waits for it, the same as a
+    // bare --snapshot does, so the caller can read the file straight away
+    if (SNAPSHOT) return awaitSnapshot(path.resolve(SNAPSHOT));
     return;
   }
 
@@ -354,9 +389,11 @@ async function main() {
     );
   }
 
+
   const [cmd, args] = splitters[host]();
   const r = spawnSync(cmd, args, { stdio: 'inherit', cwd: paneCwd });
   if (r.error || (r.status != null && r.status !== 0)) {
+    if (weHoldClaim) session.release();
     die(`Could not split the ${host} pane: ${r.error?.message || 'exit ' + r.status}`);
   }
 

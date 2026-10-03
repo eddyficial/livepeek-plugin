@@ -8,6 +8,7 @@
  * (PEEK_BROWSER may point at the executable); otherwise they print "skip".
  */
 import fs from 'node:fs';
+import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -129,6 +130,57 @@ await test('serveStatic renders README.md with an h1 and live reload', async () 
   const text = await (await fetch(url)).text();
   assert(/<h1[^>]*>\s*Big Title\s*<\/h1>/.test(text), 'no rendered h1: ' + text.slice(0, 300));
   assert(text.includes('/__peek/stamp'), 'live-reload script missing');
+});
+
+// Raw request: fetch() would collapse "/%2e%2e/" before it reached the server.
+const rawGet = (base, rawPath) => new Promise((resolve, reject) => {
+  const u = new URL(base);
+  http.get({ host: u.hostname, port: u.port, path: rawPath }, (res) => {
+    let body = '';
+    res.setEncoding('utf8');
+    res.on('data', (c) => { body += c; });
+    res.on('end', () => resolve({ status: res.statusCode, body }));
+  }).on('error', reject);
+});
+
+await test('serveStatic refuses path traversal, including sibling dirs sharing the root prefix', async () => {
+  const base = fs.mkdtempSync(path.join(TMP, 'trav-'));
+  let server;
+  try {
+    fs.mkdirSync(path.join(base, 'site'));
+    fs.mkdirSync(path.join(base, 'site2'));
+    fs.writeFileSync(path.join(base, 'site', 'index.html'), '<h1>ok</h1>');
+    fs.writeFileSync(path.join(base, 'site2', 'secret.txt'), 'SECRET');
+    fs.writeFileSync(path.join(base, 'outside.txt'), 'OUTSIDE');
+    const { serveStatic } = await lib('serve.mjs');
+    let port;
+    ({ server, port } = await serveStatic({ root: path.join(base, 'site') }));
+    const url = `http://127.0.0.1:${port}/`;
+    for (const p of ['/..%2fsite2%2fsecret.txt', '/%2e%2e/outside.txt', '/..%5coutside.txt', '/..%2foutside.txt']) {
+      const r = await rawGet(url, p);
+      assert(r.status === 403 || r.status === 404, `${p}: status ${r.status}, want 403 or 404`);
+      assert(!r.body.includes('SECRET') && !r.body.includes('OUTSIDE'), `${p}: leaked file contents`);
+    }
+    eq((await rawGet(url, '/index.html')).status, 200, 'legit file still served');
+  } finally {
+    if (server) { server.close(); server.closeAllConnections?.(); }
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});
+
+await test('serveStatic answers malformed percent-encoding with 400 and keeps serving', async () => {
+  const dir = tmpdir('serve-badpct');
+  fs.writeFileSync(path.join(dir, 'index.html'), '<h1>ok</h1>');
+  const url = await serve(dir);
+  eq((await rawGet(url, '/%E0%A4%A')).status, 400, 'malformed escape');
+  eq((await rawGet(url, '/index.html')).status, 200, 'server still alive');
+});
+
+await test('serveStatic returns 204 for /favicon.ico when the root has none', async () => {
+  const dir = tmpdir('serve-favicon');
+  fs.writeFileSync(path.join(dir, 'index.html'), '<h1>ok</h1>');
+  const url = await serve(dir);
+  eq((await rawGet(url, '/favicon.ico')).status, 204, 'favicon status');
 });
 
 await test('textview.layoutText wraps, keeps spans, bullets and rules', async () => {
