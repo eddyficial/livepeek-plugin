@@ -18,6 +18,7 @@ import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { probeTerminal, pickRenderer } from './lib/caps.mjs';
+import { locateDriver } from './lib/driver.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -75,18 +76,10 @@ function checkBrowser() {
 }
 
 // --------------------------------------------------------------- driver ----
-// A copy installed next to this script is honoured, as is a global or project one.
-const BUNDLED_DRIVER = path.join(__dirname, 'node_modules', 'playwright-core');
-
+// Found the way tui.mjs finds it: project, next to the scripts, or a global
+// npm install, so the two never disagree.
 function checkDriver() {
-  let where = fs.existsSync(path.join(BUNDLED_DRIVER, 'package.json'))
-    ? path.join(BUNDLED_DRIVER, 'package.json')
-    : null;
-  // otherwise one a project already has, found the way tui.mjs looks
-  if (!where) {
-    try { where = createRequire(process.cwd() + path.sep).resolve('playwright-core/package.json'); }
-    catch { /* not resolvable from here */ }
-  }
+  const where = locateDriver(__dirname);
   if (!where) return report('FAIL', 'driver', 'not installed. Run: npm install -g playwright-core@1.63.0');
 
   let version = 'unknown version';
@@ -154,7 +147,7 @@ function checkNpm() {
   const version = (r.stdout || '').trim();
   if (r.status === 0 && version) return report('ok', 'npm', `v${version}`);
   // with the driver already in place, npm only matters for starting dev servers
-  const haveDriver = fs.existsSync(BUNDLED_DRIVER);
+  const haveDriver = !!locateDriver(__dirname);
   report(haveDriver ? 'warn' : 'FAIL', 'npm', 'not found on PATH',
     'install Node.js with npm included; peek needs it to start dev servers');
 }

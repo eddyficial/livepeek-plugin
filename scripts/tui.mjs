@@ -34,6 +34,7 @@ import * as session from './lib/session.mjs';
 import { serveStatic } from './lib/serve.mjs';
 import * as projects from './lib/projects.mjs';
 import { EXTRACT, layoutText } from './lib/textview.mjs';
+import { findDriver } from './lib/driver.mjs';
 import { encodePng } from './lib/pngenc.mjs';
 import { phoneGeometry, composePhone } from './lib/phone.mjs';
 import { bareGeometry, composeBare } from './lib/bare.mjs';
@@ -143,28 +144,7 @@ const vp = () => {
  * in so the plugin can ship its own, then the global install.
  */
 function resolveChromium() {
-  const roots = [
-    process.cwd() + path.sep,
-    __dirname + path.sep,
-  ];
-  if (process.env.CLAUDE_PLUGIN_ROOT) {
-    roots.push(process.env.CLAUDE_PLUGIN_ROOT + path.sep);
-  }
-  // npm's global root, if there is one on this machine
-  for (const g of [process.env.npm_config_prefix, process.env.NODE_PATH]) {
-    if (g) roots.push(path.join(g, 'node_modules') + path.sep);
-  }
-
-  for (const root of roots) {
-    for (const pkg of ['playwright', 'playwright-core', 'patchright']) {
-      try {
-        const mod = createRequire(root)(pkg);
-        const chromium = mod?.chromium ?? mod?.default?.chromium;
-        if (chromium) return chromium;
-      } catch { /* try the next root */ }
-    }
-  }
-  return null;
+  return findDriver(__dirname)?.chromium ?? null;
 }
 
 /**
