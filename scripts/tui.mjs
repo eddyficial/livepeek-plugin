@@ -583,9 +583,24 @@ const C = {
 };
 
 // ---------------------------------------------------------------- paint ----
+// A pane Windows Terminal has just split answers every size question with
+// the parent window's dimensions for its first moments, and process.stdout
+// is not corrected by a resize event afterwards. So the pane asks again,
+// shortly after start, where a cursor parked at the far corner ends up; that
+// reply is the real pane size and wins over process.stdout until a genuine
+// resize event arrives. See askSize() and the 'size' event.
+let probedSize = null;
+function askSize() { out(`${ESC}[999;999H${ESC}[6n`); }
+async function applySize(rows, cols) {
+  const L = lastLayout || layout();
+  if (rows === L.rows && cols === L.cols) return;
+  probedSize = { rows, cols };
+  dirty = true; lastShot = null; lastTextKey = '';
+  await tick(true);
+}
 function layout() {
-  const cols = process.stdout.columns || 80;
-  const rows = process.stdout.rows || 24;
+  const cols = probedSize?.cols || process.stdout.columns || 80;
+  const rows = probedSize?.rows || process.stdout.rows || 24;
 
   const geom = frameOf(device()) === 'phone'
     ? phoneGeometry(device(), landscape)
@@ -880,6 +895,9 @@ function render(L, shotPng) {
 
   L.screenRect = composed.screenRect;
   paintImage(L, composed);
+  // Windows Terminal clears the footer row when a sixel lands above it, so
+  // the footer is redrawn after every image paint. One line; it is cheap.
+  if (renderMode !== 'text') { lastStatus = null; drawFooter(L); }
   lastComposed = composed;
   if (SNAPSHOT) writeSnapshot(SNAPSHOT);
 }
@@ -1397,6 +1415,14 @@ function parseInput(chunk) {
       continue;
     }
 
+    // cursor position report, the answer to askSize(): ESC [ rows ; cols R
+    const cpr = /^\x1b\[(\d+);(\d+)R/.exec(inbuf);
+    if (cpr) {
+      events.push({ t: 'size', rows: parseInt(cpr[1], 10), cols: parseInt(cpr[2], 10) });
+      inbuf = inbuf.slice(cpr[0].length);
+      continue;
+    }
+
     if (inbuf[0] === ESC) {
       // A lone ESC is ambiguous: the user pressing escape, or the first byte
       // of a sequence still in flight. Hold it and let the timer below decide.
@@ -1538,6 +1564,8 @@ async function main() {
 
   if (WATCH_DIR) watchFolder(WATCH_DIR);
 
+  for (const ms of [700, 1500, 3000, 6000]) setTimeout(askSize, ms);
+
   // one loop drives both the repaint and the shared-pane check
   tickTimer = setInterval(() => { tick(); checkControl(); }, INTERVAL);
   clearInterval(startBeat);       // tick keeps the heartbeat from here on
@@ -1546,6 +1574,7 @@ async function main() {
   // to catch it, so it is dropped - the next resize or tick tries again.
   let resizeTimer = null;
   process.stdout.on('resize', () => {
+    probedSize = null;              // from here on process.stdout is current
     dirty = true; lastShot = null;
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
@@ -1555,6 +1584,7 @@ async function main() {
 
   /** Route one event to the page or to the viewer, depending on mode. */
   async function dispatch(ev) {
+    if (ev.t === 'size') return applySize(ev.rows, ev.cols);
     if (ev.t === 'mouse') {
       // clicking and scrolling work in both modes - only keys are switched
       return handleMouse(ev.code, ev.col, ev.row, ev.press);

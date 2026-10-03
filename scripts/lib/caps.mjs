@@ -24,8 +24,8 @@ const ESC = '\x1b';
  */
 export function probeTerminal({ timeout = 400 } = {}) {
   return new Promise((resolve) => {
-    const cols = process.stdout.columns || 80;
-    const rows = process.stdout.rows || 24;
+    let cols = process.stdout.columns || 80;
+    let rows = process.stdout.rows || 24;
     const result = { cw: 10, ch: 20, bg: [12, 12, 12], sixel: false, kitty: false };
 
     if (!process.stdin.isTTY) return resolve(applyEnvHints(result));
@@ -37,6 +37,7 @@ export function probeTerminal({ timeout = 400 } = {}) {
     process.stdout.write(
       `${ESC}[14t` +
       `${ESC}[16t` +          // cell size in pixels, for terminals that skip 14t
+      `${ESC}[999;999H${ESC}[6n` +   // park the cursor at the corner and ask where it is
       `${ESC}[?2;1S` +        // XTSMGRAPHICS: largest sixel image, in pixels
       `${ESC}]11;?${ESC}\\` +
       `${ESC}[c` +
@@ -47,21 +48,32 @@ export function probeTerminal({ timeout = 400 } = {}) {
     setTimeout(() => {
       process.stdin.off('data', onData);
 
+      // The cursor-position reply (ESC [ rows ; cols R) is the one size answer
+      // that is always about this pane. A pane Windows Terminal has just split
+      // reports the parent window's rows through process.stdout and CSI 14t
+      // for a moment, which sized the image for a taller pane and put the
+      // footer below the visible area until the first resize.
+      const cpr = buf.match(/\x1b\[(\d+);(\d+)R/);
+      if (cpr) {
+        const r = parseInt(cpr[1], 10), k = parseInt(cpr[2], 10);
+        if (r > 2 && k > 2) { rows = r; cols = k; result.rows = r; result.cols = k; }
+      }
+
       // Cell size matters: if it is guessed wrong the image is drawn at the
       // wrong scale, which on a high-DPI display shrinks the page to a sliver.
+      // The exact cell reply (16t) beats dividing a window size by a row count.
       const size = buf.match(/\x1b\[4;(\d+);(\d+)t/);
       const cell = buf.match(/\x1b\[6;(\d+);(\d+)t/);
       const geo = buf.match(/\x1b\[\?2;0;(\d+);(\d+)S/);
-      if (size) {
+      if (cell && parseInt(cell[2], 10) > 0 && parseInt(cell[1], 10) > 0) {
+        result.cw = parseInt(cell[2], 10); result.ch = parseInt(cell[1], 10); result.cellFrom = '16t';
+      } else if (size) {
         const px = parseInt(size[2], 10), py = parseInt(size[1], 10);
         if (px > 0 && py > 0) {
           result.cw = Math.max(1, Math.floor(px / cols));
           result.ch = Math.max(1, Math.floor(py / rows));
           result.cellFrom = '14t';
         }
-      } else if (cell) {
-        const h = parseInt(cell[1], 10), w = parseInt(cell[2], 10);
-        if (w > 0 && h > 0) { result.cw = w; result.ch = h; result.cellFrom = '16t'; }
       } else if (geo) {
         const px = parseInt(geo[1], 10), py = parseInt(geo[2], 10);
         if (px >= cols && py >= rows) {
