@@ -6,6 +6,9 @@
     "name": "eddyficial"
   },
   "homepage": "https://github.com/eddyficial/peek",
+  "repository": "https://github.com/eddyficial/peek",
+  "documentationUrl": "https://github.com/eddyficial/peek/blob/main/GETTING-STARTED.md",
+  "supportUrl": "https://github.com/eddyficial/peek/issues",
   "license": "MIT",
   "keywords": [
     "preview", "terminal", "live-reload", "sixel", "kitty-graphics",
