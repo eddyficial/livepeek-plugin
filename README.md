@@ -11,6 +11,10 @@ checks the result instead of asking you.
 
 No browser window. No emulator. Nothing to alt-tab to.
 
+![Windows Terminal with PowerShell on the left and peek on the right, showing a fitness app inside an iPhone 15 Pro frame](docs/windows-terminal.png)
+
+*A phone app in Windows Terminal: your shell on the left, the app in an iPhone frame on the right. Save a file and it updates.*
+
 ![peek showing a landing page at desktop, laptop and phone sizes, then a markdown spec, then a live edit landing](docs/demo.gif)
 
 ```
