@@ -1,9 +1,9 @@
-# peek
+# livepeek
 
 A live viewing portal in your terminal.
 
 Whatever you're building (a website, a game, a phone app, a document, a
-mockup), `peek` renders it live in a split pane next to your work. Edit a
+mockup), livepeek renders it live in a split pane next to your work. Edit a
 file, save, watch it change. Click, scroll and type go through to the page.
 
 And Claude can look too: after it changes something, it snapshots the pane and
@@ -11,11 +11,11 @@ checks the result instead of asking you.
 
 No browser window. No emulator. Nothing to alt-tab to.
 
-![Windows Terminal with PowerShell on the left and peek on the right, showing a fitness app inside an iPhone 15 Pro frame](docs/windows-terminal.png)
+![Windows Terminal with PowerShell on the left and livepeek on the right, showing a fitness app inside an iPhone 15 Pro frame](docs/windows-terminal.png)
 
 *A phone app in Windows Terminal: your shell on the left, the app in an iPhone frame on the right. Save a file and it updates.*
 
-![peek showing a landing page at desktop, laptop and phone sizes, then a markdown spec, then a live edit landing](docs/demo.gif)
+![livepeek showing a landing page at desktop, laptop and phone sizes, then a markdown spec, then a live edit landing](docs/demo.gif)
 
 ```
 /livepeek:peek
@@ -33,10 +33,10 @@ run and the handful of things that can go wrong.
 
 ## Before you start
 
-Four things need to be on the machine. peek itself downloads nothing, ever.
+Four things need to be on the machine. livepeek itself downloads nothing, ever.
 
 - **Node.js** 18 or newer. If Claude Code runs, you have it.
-- **Chrome or Edge.** Peek drives the browser you already have instead of downloading one. Windows ships with Edge, so Windows users are covered out of the box.
+- **Chrome or Edge.** livepeek drives the browser you already have instead of downloading one. Windows ships with Edge, so Windows users are covered out of the box.
 - **A terminal that can split and draw graphics:** Windows Terminal 1.22+ (the Windows 11 default), or tmux, Zellij, Kitty or WezTerm on macOS and Linux. The stock macOS Terminal.app does not qualify.
 - **The browser driver**, one npm package, installed once by you:
 
@@ -44,9 +44,9 @@ Four things need to be on the machine. peek itself downloads nothing, ever.
   npm add --global playwright-core@1.63.0
   ```
 
-  peek finds it from the global install, from the project's own `node_modules`, or from a full `playwright` install. `peek --doctor` tells you if it is missing.
+  livepeek finds it from the global install, from the project's own `node_modules`, or from a full `playwright` install. `peek --doctor` tells you if it is missing.
 
-If you point peek at a Vite, Next or Expo project, that project's dependencies must already be in place.
+If you point livepeek at a Vite, Next or Expo project, that project's dependencies must already be in place.
 
 ## Install
 
@@ -55,7 +55,7 @@ If you point peek at a Vite, Next or Expo project, that project's dependencies m
 /plugin install livepeek@peek
 ```
 
-Nothing to add to your project. `peek` drives the Chrome or Edge already on
+Nothing to add to your project. livepeek drives the Chrome or Edge already on
 your machine, headless, through the `playwright-core` driver you installed
 once (see Before you start). If a project has full `playwright` with a
 downloaded Chromium, that is used instead.
@@ -107,7 +107,7 @@ Phones get a drawn phone body, bezel and camera cutout. Web, game and document
 viewports are drawn bare, because a browser viewport or a game canvas *is* the
 thing you're building: a phone frame around it would be a lie.
 
-Markdown is rendered as a page with live reload, served by `peek` itself;
+Markdown is rendered as a page with live reload, served by livepeek itself;
 no dependency, no dev server. Plain HTML gets the same reloader injected.
 
 33 presets ship with it: 21 real devices, 6 web breakpoints, 5 game aspect
@@ -129,7 +129,7 @@ wrong.
 
 ## Supported platforms
 
-What peek needs: Node 18 or newer, Chrome or Edge installed, and a terminal
+What livepeek needs: Node 18 or newer, Chrome or Edge installed, and a terminal
 that can split. Whether you get a picture or text depends on the terminal.
 "Verified" means driven by hand on that setup for the current release;
 "expected" means the code path is the same but nobody has run it there yet.
@@ -179,9 +179,9 @@ set -g allow-passthrough on
 
 **VS Code's terminal works, with one manual step.** Nothing outside VS Code can split its terminal, so: split it yourself (the split icon, or Ctrl+Shift+5 / Cmd+\ on a Mac), and in the new half run `peek --here`. Live reload, clicks and keys all work. For pictures rather than text, turn on the setting `terminal.integrated.enableImages` and reload the window (Developer: Reload Window); a new terminal alone is not enough. Tested on VS Code 1.140: both sixel and kitty graphics render there. Running `tmux` inside the VS Code terminal also works, and then `/livepeek:peek` splits for you.
 
-**No graphics? You get the page as text.** Some hosts cannot draw images at all (Zellij on Windows is one; it passes the terminal's sixel reply through but renders nothing). There peek lays the page out as text instead: headings, paragraphs, lists, links and buttons, wrapped to the pane. Scrolling scrolls, clicking a link or button clicks it, `i` types into a focused field. It is a reader, not a picture, so layout and colour are gone, but every word is legible. `b` cycles kitty, sixel, text and half-blocks if the automatic choice is wrong. For a sharp picture on Windows, run peek from a Windows Terminal pane directly.
+**No graphics? You get the page as text.** Some hosts cannot draw images at all (Zellij on Windows is one; it passes the terminal's sixel reply through but renders nothing). There livepeek lays the page out as text instead: headings, paragraphs, lists, links and buttons, wrapped to the pane. Scrolling scrolls, clicking a link or button clicks it, `i` types into a focused field. It is a reader, not a picture, so layout and colour are gone, but every word is legible. `b` cycles kitty, sixel, text and half-blocks if the automatic choice is wrong. For a sharp picture on Windows, run livepeek from a Windows Terminal pane directly.
 
-One pane follows you between terminals too. If you open peek in Windows
+One pane follows you between terminals too. If you open livepeek in Windows
 Terminal, then move into Zellij and run it again, the old pane is closed and a
 fresh one opens where you are now.
 
@@ -286,7 +286,7 @@ It drives a real browser, so it shows what a browser shows, and only that.
 
 ## When something is wrong
 
-`peek --doctor` (or `/livepeek:peek --doctor`) checks everything peek needs and says which renderer your terminal will get. Run it first if the pane looks like coloured noise or never opens.
+`peek --doctor` (or `/livepeek:peek --doctor`) checks everything livepeek needs and says which renderer your terminal will get. Run it first if the pane looks like coloured noise or never opens.
 
 The pane also tells you when the page is unwell: a red `2 errors` in the footer means the page threw or logged `console.error` (press `e` to read them), and `page not responding` means the browser stopped answering, which usually means a tight loop in your code.
 
@@ -302,12 +302,12 @@ node -e "try{const s=require(require('os').homedir()+'/.peek/session.json');proc
 
 `node test/run.mjs` runs the unit, launcher and browser tests. It needs no terminal multiplexer; the browser tests use whatever Chrome or Edge it finds and skip if there is none. The same suite runs on Windows and Linux in GitHub Actions on every push.
 
-## What peek runs
+## What livepeek runs
 
-Everything peek does, so you can check it before installing:
+Everything livepeek does, so you can check it before installing:
 
 - **Starts a headless Chrome or Edge** that is already installed on your machine, and screenshots it. No browser is downloaded.
-- **Downloads nothing.** The browser driver (`playwright-core`, pinned to 1.63.0) is something you install once with npm; peek only looks for it and tells you the command if it is missing.
+- **Downloads nothing.** The browser driver (`playwright-core`, pinned to 1.63.0) is something you install once with npm; livepeek only looks for it and tells you the command if it is missing.
 - **Serves your files on localhost.** For a plain folder, `.html` or `.md` file it starts a small web server on a random local port. It does not listen on other network interfaces.
 - **Starts your dev server, only if you ask.** Opening a Vite, Next, Expo or similar project runs that project's own `npm run` script, and picking a stopped project in the `p` list does the same.
 - **Writes a little local state** to `~/.peek/`: which pane is open, and the folders you have previewed (`projects.json`). Delete the folder to clear it.

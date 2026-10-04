@@ -1,11 +1,11 @@
-# Getting started with peek
+# Getting started with livepeek
 
-You just installed `peek`. Here's what it does and how to get a live view of
+You just installed livepeek. Here's what it does and how to get a live view of
 your project up in about a minute.
 
 ## What it is
 
-`peek` puts a live view of whatever you're building into a split pane in the
+livepeek puts a live view of whatever you're building into a split pane in the
 terminal you're already working in. You edit a file, save, and the pane
 updates. You can click and scroll in it, and type into it.
 
@@ -16,7 +16,7 @@ No browser window. No emulator. Nothing to alt-tab to.
 
 ## Before you start: one requirement
 
-**1. A terminal that can split itself.** `peek` doesn't open a window; it asks
+**1. A terminal that can split itself.** livepeek doesn't open a window; it asks
 your terminal for a new pane. That means you need one of:
 
 - **tmux**: works on macOS, Linux and Windows. If you're unsure, use this.
@@ -32,7 +32,7 @@ Then start Claude Code inside it. (If you're on tmux, also add
 `set -g allow-passthrough on` to your `~/.tmux.conf`; tmux blocks graphics
 sequences without it.)
 
-No multiplexer at all? `peek` still works, it just runs in your current pane
+No multiplexer at all? livepeek still works, it just runs in your current pane
 instead of splitting; see `--here` below.
 
 Then one package, installed once and never again:
@@ -41,8 +41,8 @@ Then one package, installed once and never again:
 npm add --global playwright-core@1.63.0
 ```
 
-That is the driver `peek` uses to steer the Chrome or Edge already on your
-machine, headless. `peek` downloads nothing itself. You won't see a browser
+That is the driver livepeek uses to steer the Chrome or Edge already on your
+machine, headless. livepeek downloads nothing itself. You won't see a browser
 window.
 
 ## Your first run
@@ -53,7 +53,7 @@ From inside your project, in Claude Code:
 /livepeek:peek
 ```
 
-That's it. `peek` will:
+That's it. livepeek will:
 
 1. find your project root
 2. work out which framework it is
@@ -111,7 +111,7 @@ Once it's focused:
 | **click / scroll** | goes straight through to the page |
 | **`i`** | typing mode: your keystrokes go to the page. `esc` stops |
 | **`space`** | pick a device: start typing to filter (`iph`, `sam`, `pixel`) |
-| **`p`** | switch project: every folder you have peeked before, plus any dev server running. Pick a stopped one and peek starts it |
+| **`p`** | switch project: every folder you have peeked before, plus any dev server running. Pick a stopped one and livepeek starts it |
 | `shift`+`?` | show every key |
 | `[` `]` | previous / next device |
 | `o` | rotate |
@@ -154,7 +154,7 @@ terminal and its graphics support, and tells you which renderer you will get
 and why.
 
 
-**The view is coloured mush, or garbage characters.** `peek` guessed your
+**The view is coloured mush, or garbage characters.** livepeek guessed your
 terminal's graphics support wrong. Press `b` to cycle through the three
 renderers until it looks right.
 
@@ -177,7 +177,7 @@ set -g allow-passthrough on
 /livepeek:peek --here
 ```
 
-**"The browser driver is not installed."** peek downloads nothing itself;
+**"The browser driver is not installed."** livepeek downloads nothing itself;
 the driver is one npm package you install once. Either globally:
 
 ```bash
@@ -187,7 +187,7 @@ npm add --global playwright-core@1.63.0
 or in the project (`npm add --save-dev playwright-core@1.63.0`). `peek --doctor` confirms
 it is found.
 
-**You see a "peek is ready" welcome page.** The folder has no framework it
+**You see a "livepeek is ready" welcome page.** The folder has no framework it
 recognises and no `index.html`, `.html` or `.md` yet. Start building, or name
 the thing you mean:
 
@@ -198,7 +198,7 @@ the thing you mean:
 
 **The page is blank.** Your dev server is up but serving nothing useful. Open
 the URL in a normal browser to confirm. For Expo projects it's usually missing
-web-build dependencies; `peek` will tell you and offer to install them.
+web-build dependencies; livepeek will tell you and offer to install them.
 
 **It's tiny or cut off.** The pane is too narrow for the viewport. Try a wider
 pane or a smaller viewport:
@@ -238,7 +238,7 @@ to filter the list.
 /livepeek:peek --dry-run                  show what it would do, then stop
 ```
 
-## When peek is the wrong tool
+## When livepeek is the wrong tool
 
 It drives a real browser, so it shows what a browser shows, and nothing else.
 
@@ -267,4 +267,4 @@ PNG it wrote is the page at full size.
 
 Ask Claude in your session: the plugin ships a skill, so Claude knows how it
 works, what the error codes mean, and how to fix the common problems. "the
-peek pane looks wrong" is a perfectly good prompt.
+livepeek pane looks wrong" is a perfectly good prompt.

@@ -4,7 +4,7 @@ description: Open a live view of whatever the user is building - a website, a ga
 version: 0.4.0
 ---
 
-# peek: a live viewing portal in the terminal
+# livepeek: a live viewing portal in the terminal
 
 Opens a live view of the current project in a split pane in the user's
 existing terminal. No browser window, no emulator, nothing to alt-tab to.
@@ -14,11 +14,11 @@ The pane is interactive: click and scroll go through to the page.
 Works for anything a dev server can serve (websites, games on a canvas, phone
 apps through their web build) and for things with no server at all: a folder
 with an `index.html`, a single `.html` mockup, or a markdown document. Those
-are served by peek itself, with live reload.
+are served by livepeek itself, with live reload.
 
-Nothing needs installing in the user's project. peek drives the Chrome or
+Nothing needs installing in the user's project. livepeek drives the Chrome or
 Edge already on the machine through `playwright-core`, which the user installs
-once (`npm add --global playwright-core@1.63.0`). peek downloads nothing itself.
+once (`npm add --global playwright-core@1.63.0`). livepeek downloads nothing itself.
 
 ## Launching it
 
@@ -63,7 +63,7 @@ peek --snapshot .peek/snapshot.png
 ```
 
 then read the PNG with the Read tool. The path is relative to the project and
-peek creates the `.peek` folder if it is missing; `/tmp` does not exist on
+livepeek creates the `.peek` folder if it is missing; `/tmp` does not exist on
 Windows, so do not reach for it. It is the page at full resolution (the
 same thing the pane is painting), so text is legible. Wait a couple of seconds
 after saving a file first; the dev server or the built-in reloader needs a
@@ -88,7 +88,7 @@ between them. Do not treat it as a failure, and do not reach for `--new` unless
 the user actually asks for two views side by side.
 
 The pane is also switchable from the inside with `p`, which lists every
-project peek has shown before plus any dev server currently running.
+project livepeek has shown before plus any dev server currently running.
 
 **Never kill the pane process to stop it.** A non-zero exit makes Windows
 Terminal keep the dead pane on screen. Use `--quit`, or tell the user to press
@@ -118,13 +118,13 @@ breakpoints (`desktop`, `desktop-wide`, `laptop`, `laptop-small`,
 Check the exit code before reporting success.
 
 **An empty folder is fine.** With no dev server dependency and no `index.html`,
-`.html` or `.md` in the directory, peek opens a built-in welcome page that
+`.html` or `.md` in the directory, livepeek opens a built-in welcome page that
 tells the user to start building. The pane watches that folder and switches to
 an `index.html`, `.html` or `.md` the moment one appears, with no relaunch. If the user
 meant a specific file or server, give it `--file` or `--url`; do not guess a port.
 
 **"The browser driver is not installed"** (shown inside the pane, or by
-`peek --doctor`): peek downloads nothing itself. Tell the user to run
+`peek --doctor`): livepeek downloads nothing itself. Tell the user to run
 `npm add --global playwright-core@1.63.0` once (or add the same package to the project's
 dev dependencies), then launch again. Ask before running it for them; it is
 an install on their machine.
@@ -177,10 +177,10 @@ The renderer is probed at startup and the footer names which one is active.
 - **Blank page**: the server is up but serving nothing useful. For Expo it's
   usually the missing web deps above. Check the URL directly first.
 - **The pane shows the page as text, footer says `text`**: the host draws
-  no graphics (Zellij on Windows does this), so peek renders the DOM as
+  no graphics (Zellij on Windows does this), so livepeek renders the DOM as
   readable text: headings, paragraphs, links, buttons, inputs. Clicks and
   scrolling still work; `--snapshot` still writes the real pixels. This is
-  expected there. For a sharp picture, run peek from a Windows Terminal pane
+  expected there. For a sharp picture, run livepeek from a Windows Terminal pane
   instead of inside Zellij.
 - **Nothing renders under tmux**: tmux needs `set -g allow-passthrough on`
   for graphics sequences to reach the terminal.
@@ -196,7 +196,7 @@ Focus the pane first (`alt`+arrow in most terminals, `prefix`+arrow in tmux).
 | click / scroll | goes through to the page |
 | `i` | typing mode: keystrokes go to the page; `esc` stops |
 | `space` | device picker: typing filters the list (`iph`, `sam`, `pixel`, `desk`) |
-| `p` | switch project: folders peek has shown before (kept in `~/.peek/projects.json`), plus any dev server currently running; picking a stopped framework project starts its dev server |
+| `p` | switch project: folders livepeek has shown before (kept in `~/.peek/projects.json`), plus any dev server currently running; picking a stopped framework project starts its dev server |
 | `shift`+`?` | help overlay listing every key |
 | `[` `]` | previous / next device |
 | `o` | rotate |

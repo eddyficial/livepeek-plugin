@@ -159,7 +159,7 @@ function resolveChromium() {
 // peek downloads nothing at run time. The browser driver is one npm package,
 // installed once by the user; the message says exactly which command.
 export const DRIVER_HINT =
-  'The browser driver is not installed. Install it once, then run peek again:\n\n' +
+  'The browser driver is not installed. Install it once, then launch livepeek again:\n\n' +
   '  npm add --global playwright-core@1.63.0\n\n' +
   'Or per project:  npm add --save-dev playwright-core@1.63.0\n' +
   '(peek --doctor checks for it.)';
@@ -1457,7 +1457,7 @@ async function main() {
   startBeat = setInterval(beat, 2000);
 
   out(`${ESC}[?1049h${ESC}[?25l`);          // alt screen, hide cursor
-  out(`${ESC}]0;peek${String.fromCharCode(7)}`);   // tab title: VS Code otherwise names it after the browser child
+  out(`${ESC}]0;livepeek${String.fromCharCode(7)}`);   // tab title: VS Code otherwise names it after the browser child
   if (process.stdin.isTTY) process.stdin.setRawMode(true);
   process.stdin.resume();
 
@@ -1622,7 +1622,7 @@ async function main() {
       menuOpen ? closeMenu() : openMenu('preset');
       if (!menuOpen) await tick(true);
     }
-    else if (k === '?') { openOverlay('peek keys', HELP); }
+    else if (k === '?') { openOverlay('livepeek keys', HELP); }
     else if (k === 'p') {
       // switch which project the pane is looking at, without restarting it
       if (menuOpen) closeMenu();
@@ -1730,7 +1730,7 @@ main().catch((e) => {
   clearInterval(startBeat);
   out(`${ESC}[?1003l${ESC}[?1006l${ESC}[?1002l${ESC}[?1000l${ESC}[?25h${ESC}[?1049l`);
   releaseSession();
-  console.error('\npeek could not start:\n\n' + (e.message || e) + '\n');
+  console.error('\nlivepeek could not start:\n\n' + (e.message || e) + '\n');
   // Exit 0 after a keypress rather than 1 immediately. A non-zero exit makes
   // the terminal keep this pane open as a corpse; a zero exit on a key gives
   // the user time to read the error and then takes the pane away cleanly.

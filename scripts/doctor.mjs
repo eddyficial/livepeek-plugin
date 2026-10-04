@@ -149,7 +149,7 @@ function checkNpm() {
   // with the driver already in place, npm only matters for starting dev servers
   const haveDriver = !!locateDriver(__dirname);
   report(haveDriver ? 'warn' : 'FAIL', 'npm', 'not found on PATH',
-    'install Node.js with npm included; peek needs it to start dev servers');
+    'install Node.js with npm included; livepeek needs it to start dev servers');
 }
 
 // ----------------------------------------------------------------- home ----
@@ -163,7 +163,7 @@ function checkHome() {
     report('ok', '~/.peek', `writable (${dir})`);
   } catch (e) {
     report('FAIL', '~/.peek', `cannot write to ${dir}: ${e.code || e.message}`,
-      'make that folder writable; peek keeps its pane state and project list there');
+      'make that folder writable; livepeek keeps its pane state and project list there');
   }
 }
 
@@ -178,7 +178,7 @@ checkHome();
 
 const plural = (n, w) => `${n} ${w}${n > 1 ? 's' : ''}`;
 console.log('');
-if (failed) console.log(`${plural(failed, 'blocking problem')}${warned ? `, ${plural(warned, 'warning')}` : ''}: peek cannot run yet.`);
-else if (warned) console.log(`peek can run, with ${plural(warned, 'warning')}.`);
-else console.log('all good: peek can run here.');
+if (failed) console.log(`${plural(failed, 'blocking problem')}${warned ? `, ${plural(warned, 'warning')}` : ''}: livepeek cannot run yet.`);
+else if (warned) console.log(`livepeek can run, with ${plural(warned, 'warning')}.`);
+else console.log('all good: livepeek can run here.');
 process.exit(failed ? 1 : 0);

@@ -1,5 +1,5 @@
 {
-  "name": "peek",
+  "name": "livepeek",
   "private": true,
   "scripts": {
     "test": "node test/run.mjs"

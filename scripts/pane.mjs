@@ -251,7 +251,7 @@ const splitters = {
     '-w', '0', 'split-pane',
     flag('--horizontal') ? '--horizontal' : '--vertical',
     '--size', String(SIZE),
-    '--title', 'peek',
+    '--title', 'livepeek',
     '-d', paneCwd,
     ...previewCmd,
   // wt documents backslash-semicolon as the escape, so a project folder or
@@ -267,7 +267,7 @@ async function main() {
   // makes it exit non-zero, and Windows Terminal keeps a pane open on an
   // abnormal exit - which is how you end up with a row of dead panes.
   if (flag('--quit')) {
-    if (!open) return console.log('no peek pane is open.');
+    if (!open) return console.log('no livepeek pane is open.');
     session.write({ ...open, quit: true, rev: (open.rev || 0) + 1 });
     return console.log('asked the open pane to close.');
   }
@@ -276,7 +276,7 @@ async function main() {
   // the JSON result. Pairs with --snapshot: look, then read the exact state.
   const EVAL = arg('--eval', null);
   if (EVAL) {
-    if (!open) die('no peek pane is open.');
+    if (!open) die('no livepeek pane is open.');
     session.write({ ...open, eval: EVAL, evalResult: null, rev: (open.rev || 0) + 1 });
     const deadline = Date.now() + 8000;
     while (Date.now() < deadline) {
@@ -290,7 +290,7 @@ async function main() {
   // --snapshot alone: ask the open pane to write what it is showing, and
   // wait for it. This is how an agent sees the pane.
   if (SNAPSHOT && !open && argv.length <= 2) {
-    die('no peek pane is open to snapshot. Run peek first, then --snapshot.');
+    die('no livepeek pane is open to snapshot. Run peek first, then --snapshot.');
   }
   /** Wait for the open pane to report the snapshot asked for. */
   const awaitSnapshot = async (file) => {
@@ -388,7 +388,7 @@ async function main() {
     // VS Code's terminal can split, but nothing outside VS Code can ask it
     // to, so the user does that part and runs the viewer in the new half.
     die(
-      '\nThis is the VS Code terminal. It can show peek, but it has to be split by hand:\n\n' +
+      '\nThis is the VS Code terminal. It can show livepeek, but it has to be split by hand:\n\n' +
       '  1. Split the terminal: the split icon in the terminal panel, or Ctrl+Shift+5\n' +
       '     (Cmd+\\ on a Mac).\n' +
       '  2. In the new half run:\n' +
@@ -396,8 +396,8 @@ async function main() {
       '     (or just: peek --here, if the peek command is installed)\n\n' +
       'For pictures instead of text, turn on the VS Code setting\n' +
       '  terminal.integrated.enableImages\n' +
-      'and reload the window (Developer: Reload Window). Without it peek shows the page as text.\n\n' +
-      'Or run tmux inside the VS Code terminal and peek splits it for you.\n',
+      'and reload the window (Developer: Reload Window). Without it livepeek shows the page as text.\n\n' +
+      'Or run tmux inside the VS Code terminal and livepeek splits it for you.\n',
       3
     );
   }
@@ -432,7 +432,7 @@ async function main() {
     }
   }
 
-  console.log(`\npeek opened (${host}): ${TARGET} at ${PRESET}`);
+  console.log(`\nlivepeek opened (${host}): ${TARGET} at ${PRESET}`);
   console.log('  keys   space device  ·  p project  ·  shift+? help  ·  q quit  ·  mouse works');
   console.log('  close  press q in the pane so the headless browser shuts down cleanly');
 }
