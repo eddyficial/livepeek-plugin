@@ -1,6 +1,6 @@
 # livepeek
 
-A live viewing portal in your terminal.
+A live viewing portal in your terminal. A Claude Code plugin.
 
 Whatever you're building (a website, a game, a phone app, a document, a
 mockup), livepeek renders it live in a split pane next to your work. Edit a
@@ -37,7 +37,7 @@ Four things need to be on the machine. livepeek itself downloads nothing, ever.
 
 - **Node.js** 18 or newer. If Claude Code runs, you have it.
 - **Chrome or Edge.** livepeek drives the browser you already have instead of downloading one. Windows ships with Edge, so Windows users are covered out of the box.
-- **A terminal that can split and draw graphics:** Windows Terminal 1.22+ (the Windows 11 default), or tmux, Zellij, Kitty or WezTerm on macOS and Linux. The stock macOS Terminal.app does not qualify.
+- **A terminal that can split and draw graphics**, for the full experience: Windows Terminal 1.22+ (the Windows 11 default), or tmux, Zellij, Kitty or WezTerm on macOS and Linux. Anything else still works with less: `--here` runs in the current pane when the terminal can't split, and terminals that can't draw images get the page as text.
 - **The browser driver**, one npm package, installed once by you:
 
   ```
@@ -97,11 +97,15 @@ Every option in [Options](#options) works the same way.
 
 | you're building | detected from | opens on |
 |---|---|---|
-| a website | Next, Nuxt, SvelteKit, Astro, Remix, Gatsby, Docusaurus, Angular, CRA, Vite, Parcel, webpack | `desktop`: 1440×900, no bezel |
+| a website | Next, Nuxt, SvelteKit, Astro, Remix, Gatsby, Docusaurus, Angular, CRA, Vite, Parcel, webpack | `fit`: the pane's own size, no bezel |
 | a game | any of the above **plus** Phaser, three, Pixi, Babylon, Excalibur, Kaplay, p5 or PlayCanvas | `game-720p`: 16:9, no bezel |
-| a phone app | Expo, React Native | `iphone-15-pro`, with a phone body |
-| a document or mockup | a folder with `index.html`, any `.html`, or a `.md` file (no package.json needed) | `desktop`, or `document` (900×1200) for markdown |
+| a phone app | Expo (React Native through its web build) | `iphone-15-pro`, with a phone body |
+| a document or mockup | a folder with `index.html`, any `.html`, or a `.md` file (no package.json needed) | `fit` |
 | something else | nothing detected | give it `--url http://localhost:1234` or `--file path` |
+
+`fit` renders at the pane's own pixel size, so text is never scaled down; a
+fixed size such as `desktop` (1440×900) or `document` (900×1200) is one
+`--preset` away.
 
 Phones get a drawn phone body, bezel and camera cutout. Web, game and document
 viewports are drawn bare, because a browser viewport or a game canvas *is* the
@@ -110,27 +114,30 @@ thing you're building: a phone frame around it would be a lie.
 Markdown is rendered as a page with live reload, served by livepeek itself;
 no dependency, no dev server. Plain HTML gets the same reloader injected.
 
-33 presets ship with it: 21 real devices, 6 web breakpoints, 5 game aspect
-ratios, 2 document pages. `node scripts/tui.mjs --list` prints the ids, and adding one is a
+34 presets ship with it: 20 real devices, 7 web sizes (including `fit`, which
+fills the pane), 5 game aspect ratios, 2 document pages. `node scripts/tui.mjs --list` prints the ids, and adding one is a
 single line in `scripts/presets.js`.
 
 ## How it looks
 
-Real pixels, not ASCII art. The renderer is probed at startup, never assumed:
+Real pixels wherever the terminal can draw them. The renderer is probed at
+startup, never assumed:
 
 | renderer | terminals | notes |
 |---|---|---|
 | kitty graphics | Kitty, Ghostty, WezTerm | 24-bit colour, zlib-compressed frames |
-| sixel | Windows Terminal 1.22+, xterm, foot, mlterm | 128-colour quantised |
-| half-blocks | anything with truecolor | always works, coarse |
+| sixel | Windows Terminal 1.22+, xterm, foot, mlterm | up to 256 colours |
+| text | terminals that can't draw images (the automatic fallback) | the page laid out as readable text; see Terminals |
+| half-blocks | anything with truecolor | coarse picture; pick it with `b` |
 
 The footer names the active renderer. Press `b` to cycle if the probe got it
 wrong.
 
 ## Supported platforms
 
-What livepeek needs: Node 18 or newer, Chrome or Edge installed, and a terminal
-that can split. Whether you get a picture or text depends on the terminal.
+What livepeek needs: Node 18 or newer and Chrome or Edge installed. A terminal
+that can split opens the pane for you; anywhere else, `--here` runs it in the
+current pane. Whether you get a picture or text depends on the terminal.
 "Verified" means driven by hand on that setup for the current release;
 "expected" means the code path is the same but nobody has run it there yet.
 
@@ -249,6 +256,8 @@ analogue-feeling input will be approximate.
 /livepeek:livepeek --url http://localhost:1234   skip detection, point at a server
 /livepeek:livepeek --port 3000              non-default dev server port
 /livepeek:livepeek --size 0.4               wider pane
+/livepeek:livepeek --interval 200           refresh faster (default 600 ms, more CPU)
+/livepeek:livepeek --render sixel           force a renderer: kitty, sixel or blocks
 /livepeek:livepeek --horizontal             split below instead of beside
 /livepeek:livepeek --no-serve               a server is already running
 /livepeek:livepeek --file docs/spec.md      show one file (markdown or html)
@@ -300,7 +309,7 @@ node -e "try{const s=require(require('os').homedir()+'/.livepeek/session.json');
 
 ## Tests
 
-`node test/run.mjs` runs the unit, launcher and browser tests. It needs no terminal multiplexer; the browser tests use whatever Chrome or Edge it finds and skip if there is none. The same suite runs on Windows and Linux in GitHub Actions on every push.
+`node test/run.mjs` runs the unit, launcher and browser tests. It needs no terminal multiplexer; the browser tests use whatever Chrome or Edge it finds and skip if there is none, or if `playwright-core` cannot be resolved from the repo. The same suite runs on Windows and Linux in GitHub Actions on every push.
 
 ## What livepeek runs
 
@@ -324,10 +333,13 @@ in the pane lands at the right page coordinate.
 
 ```
 scripts/
-  pane.mjs        detect terminal + framework, start the server, split
+  pane.mjs        detect terminal + framework, split, hand off to the viewer
   targets.mjs     framework -> port, dev script, default preset
-  tui.mjs         the viewer itself
+  tui.mjs         the viewer itself; starts the dev server inside the pane
+  doctor.mjs      --doctor: checks Node, browser, driver, terminal, graphics
   presets.js      viewports: devices, web breakpoints, game ratios
+  welcome/        the page shown when a folder has nothing to preview
+  lib/driver.mjs  finds playwright-core (global, project, or full playwright)
   lib/caps.mjs    terminal capability probe, renderer choice
   lib/png.mjs     PNG decoder (zlib + scanline unfilter)
   lib/sixel.mjs   sixel encoder, plus the half-block fallback
@@ -337,6 +349,9 @@ scripts/
   lib/serve.mjs   built-in static server, markdown renderer, live reload
   lib/pngenc.mjs  PNG encoder for snapshots
   lib/session.mjs one shared pane: reuse, retarget, snapshot, eval
+  lib/projects.mjs folders previewed before, for the `p` picker
+  lib/state.mjs   the ~/.livepeek directory (and one-time ~/.peek migration)
+  lib/textview.mjs text renderer for hosts that cannot draw images
 ```
 
 ## Licence
