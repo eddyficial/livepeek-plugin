@@ -326,7 +326,7 @@ node -e "try{const s=require(require('os').homedir()+'/.livepeek/session.json');
 
 ## What livepeek runs
 
-Everything livepeek does, so you can check it before installing:
+Everything livepeek does, so you can check it before installing. It collects and sends nothing; see [PRIVACY.md](PRIVACY.md).
 
 - **Starts a headless Chrome or Edge** that is already installed on your machine, and screenshots it. No browser is downloaded.
 - **Downloads nothing.** The browser driver (`playwright-core`, pinned to 1.63.0) is something you install once with npm; livepeek only looks for it and tells you the command if it is missing.

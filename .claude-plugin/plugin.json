@@ -8,9 +8,24 @@
   },
   "homepage": "https://github.com/eddyficial/livepeek-plugin",
   "repository": "https://github.com/eddyficial/livepeek-plugin",
+  "documentationUrl": "https://github.com/eddyficial/livepeek-plugin/blob/main/GETTING-STARTED.md",
+  "supportUrl": "https://github.com/eddyficial/livepeek-plugin/issues",
+  "privacyPolicyUrl": "https://github.com/eddyficial/livepeek-plugin/blob/main/PRIVACY.md",
   "license": "MIT",
   "keywords": [
-    "preview", "terminal", "live-reload", "sixel", "kitty-graphics",
-    "web", "game", "expo", "react-native", "vite", "next", "markdown", "document", "snapshot"
+    "preview",
+    "terminal",
+    "live-reload",
+    "sixel",
+    "kitty-graphics",
+    "web",
+    "game",
+    "expo",
+    "react-native",
+    "vite",
+    "next",
+    "markdown",
+    "document",
+    "snapshot"
   ]
 }
