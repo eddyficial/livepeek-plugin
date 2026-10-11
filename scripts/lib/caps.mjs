@@ -53,6 +53,7 @@ export function probeTerminal({ timeout = 400 } = {}) {
       // reports the parent window's rows through process.stdout and CSI 14t
       // for a moment, which sized the image for a taller pane and put the
       // footer below the visible area until the first resize.
+      // eslint-disable-next-line no-control-regex -- terminal replies contain ESC.
       const cpr = buf.match(/\x1b\[(\d+);(\d+)R/);
       if (cpr) {
         const r = parseInt(cpr[1], 10), k = parseInt(cpr[2], 10);
@@ -62,8 +63,11 @@ export function probeTerminal({ timeout = 400 } = {}) {
       // Cell size matters: if it is guessed wrong the image is drawn at the
       // wrong scale, which on a high-DPI display shrinks the page to a sliver.
       // The exact cell reply (16t) beats dividing a window size by a row count.
+      // eslint-disable-next-line no-control-regex -- terminal replies contain ESC.
       const size = buf.match(/\x1b\[4;(\d+);(\d+)t/);
+      // eslint-disable-next-line no-control-regex -- terminal replies contain ESC.
       const cell = buf.match(/\x1b\[6;(\d+);(\d+)t/);
+      // eslint-disable-next-line no-control-regex -- terminal replies contain ESC.
       const geo = buf.match(/\x1b\[\?2;0;(\d+);(\d+)S/);
       if (cell && parseInt(cell[2], 10) > 0 && parseInt(cell[1], 10) > 0) {
         result.cw = parseInt(cell[2], 10); result.ch = parseInt(cell[1], 10); result.cellFrom = '16t';
@@ -84,6 +88,7 @@ export function probeTerminal({ timeout = 400 } = {}) {
       }
 
       // OSC 11 reply: rgb:RRRR/GGGG/BBBB (16 bits per channel)
+      // eslint-disable-next-line no-control-regex -- terminal replies contain ESC.
       const bg = buf.match(/\x1b\]11;rgb:([0-9a-f]+)\/([0-9a-f]+)\/([0-9a-f]+)/i);
       if (bg) {
         result.bg = [1, 2, 3].map(i => {
@@ -93,10 +98,12 @@ export function probeTerminal({ timeout = 400 } = {}) {
       }
 
       // DA1 reply: ESC [ ? 62 ; 4 ; 6 c  - attribute 4 is "sixel graphics"
+      // eslint-disable-next-line no-control-regex -- terminal replies contain ESC.
       const da1 = buf.match(/\x1b\[\?([0-9;]+)c/);
       if (da1 && da1[1].split(';').includes('4')) result.sixel = true;
 
       // kitty answers its own query with ESC _ G i=31;OK ESC \
+      // eslint-disable-next-line no-control-regex -- Kitty replies contain ESC.
       if (/\x1b_Gi=31;OK/.test(buf)) result.kitty = true;
 
       resolve(applyEnvHints(result));

@@ -18,6 +18,15 @@ jobs:
         with:
           node-version: 20
 
+      - name: Install dev tools
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
       # the browser driver livepeek uses; pinned to the same
       # version tui.mjs installs
       - name: Install playwright-core
@@ -54,4 +63,4 @@ jobs:
           '
 
       - name: Test
-        run: node test/run.mjs
+        run: npm test

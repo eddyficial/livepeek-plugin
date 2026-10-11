@@ -16,7 +16,7 @@ No browser window. No emulator. Nothing to alt-tab to.
 
 ## Before you start
 
-livepeek needs Node.js 18 or newer, Chrome or Edge, and one browser-driver
+livepeek needs Node.js 20 or newer, Chrome or Edge, and one browser-driver
 package:
 
 ```bash

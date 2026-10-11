@@ -1,7 +1,20 @@
 {
   "name": "livepeek",
   "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
+    "lint": "eslint scripts test eslint.config.js",
+    "typecheck": "tsc -p jsconfig.json",
     "test": "node test/run.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "9.39.5",
+    "@types/node": "24.13.4",
+    "eslint": "9.39.5",
+    "globals": "17.13.0",
+    "typescript": "5.9.3"
   }
 }

@@ -32,7 +32,7 @@ export function detectHost(env = process.env) {
   if (env.TMUX && !vscode) return 'tmux';
   if (vscode) return null;
   if (env.ZELLIJ) return 'zellij';
-  if (env.KITTY_LISTEN_ON) return 'kitty';
+  if (env.KITTY_LISTEN_ON || env.KITTY_WINDOW_ID) return 'kitty';
   if (env.WEZTERM_PANE) return 'wezterm';
   if (env.WT_SESSION) return 'wt';
   return null;

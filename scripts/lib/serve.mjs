@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
+import crypto from 'node:crypto';
 
 const TYPES = {
   '.html': 'text/html; charset=utf-8', '.htm': 'text/html; charset=utf-8',
@@ -32,6 +33,37 @@ const RELOAD = `<script>(()=>{let s=null;setInterval(async()=>{try{const r=await
 const STAMP_TTL = 400;
 const STAMP_MAX = 5000;
 let lastStamp = null, stampAt = 0, stampRoot = null;
+
+const sameToken = (a, b) => {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const aa = Buffer.from(a), bb = Buffer.from(b);
+  return aa.length === bb.length && crypto.timingSafeEqual(aa, bb);
+};
+
+/** Require the one-time LAN link once, then accept its HttpOnly cookie. */
+export function gateLanRequest(token, serve) {
+  return (req, res) => {
+    const url = new URL(req.url || '/', 'http://livepeek');
+    const cookieName = `lp_t_${req.socket.localPort}`;
+    if (sameToken(url.searchParams.get('t'), token)) {
+      url.searchParams.delete('t');
+      res.writeHead(302, {
+        location: '/' + url.pathname.replace(/^\/+/, '') + url.search,
+        'set-cookie': `${cookieName}=${token}; HttpOnly; SameSite=Strict; Path=/`,
+        'cache-control': 'no-store',
+      });
+      return res.end();
+    }
+    const cookies = String(req.headers.cookie || '').split(';');
+    const prefix = cookieName + '=';
+    if (cookies.some(x => {
+      const cookie = x.trim();
+      return cookie.startsWith(prefix) && sameToken(cookie.slice(prefix.length), token);
+    })) return serve(req, res);
+    res.writeHead(403, { 'content-type': 'text/plain; charset=utf-8', 'cache-control': 'no-store' });
+    res.end('forbidden');
+  };
+}
 
 /** Newest mtime under root, as a string. Skips node_modules and dot dirs. */
 function stamp(root) {
@@ -245,6 +277,9 @@ export function serveStatic({ root, file = null, port = 0 }) {
   }
   return new Promise((resolve, reject) => {
     server.on('error', reject);
-    server.listen(port, '127.0.0.1', () => resolve({ server, port: server.address().port }));
+    server.listen(port, '127.0.0.1', () => {
+      const address = server.address();
+      resolve({ server, port: typeof address === 'object' && address ? address.port : port });
+    });
   });
 }

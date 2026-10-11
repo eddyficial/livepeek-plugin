@@ -46,7 +46,7 @@ export function pickProbe({ pt, mode }) {
     }
     const r = el.getBoundingClientRect();
     Object.assign(box.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
-    const tag = box.firstChild;
+    const tag = /** @type {HTMLElement} */ (box.firstChild);
     tag.textContent = shortName(el);
     // the label sits above the outline, or inside it at the top of the page
     tag.style.top = r.top >= 18 ? '-20px' : '0';
@@ -89,7 +89,9 @@ export function pickProbe({ pt, mode }) {
     return null;
   };
   const r = el.getBoundingClientRect();
-  const text = (el.innerText || el.value || el.getAttribute('aria-label') || el.getAttribute('alt')
+  const htmlEl = /** @type {HTMLElement} */ (el);
+  const inputEl = /** @type {HTMLInputElement} */ (el);
+  const text = (htmlEl.innerText || inputEl.value || el.getAttribute('aria-label') || el.getAttribute('alt')
     || el.getAttribute('placeholder') || el.getAttribute('title') || '').trim().replace(/\s+/g, ' ');
   return {
     tag: el.tagName.toLowerCase(),

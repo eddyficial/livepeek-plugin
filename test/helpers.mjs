@@ -57,13 +57,13 @@ export async function serve(root, opts = {}) {
 }
 
 // Raw request. A high-level client would collapse "/%2e%2e/" before it reached the server.
-export const httpGetRaw = (base, rawPath) => new Promise((resolve, reject) => {
+export const httpGetRaw = (base, rawPath, headers = {}) => new Promise((resolve, reject) => {
   const u = new URL(base);
-  http.get({ host: u.hostname, port: u.port, path: rawPath }, (res) => {
+  http.get({ host: u.hostname, port: u.port, path: rawPath, headers }, (res) => {
     let body = '';
     res.setEncoding('utf8');
     res.on('data', (c) => { body += c; });
-    res.on('end', () => resolve({ status: res.statusCode, body }));
+    res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body }));
   }).on('error', reject);
 });
 

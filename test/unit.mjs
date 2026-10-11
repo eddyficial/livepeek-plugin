@@ -1,5 +1,6 @@
 /** Unit tests: image encoders, project list, text layout, static server. */
 import fs from 'node:fs';
+import http from 'node:http';
 import path from 'node:path';
 import { HOME, TMP, lib, tmpdir, test, eq, assert, serve, httpGetRaw } from './helpers.mjs';
 
@@ -197,6 +198,46 @@ await test('serveStatic returns 204 for /favicon.ico when the root has none', as
   eq((await httpGetRaw(url, '/favicon.ico')).status, 204, 'favicon status');
 });
 
+await test('session detects Kitty from either Kitty environment variable', async () => {
+  const { detectHost } = await lib('session.mjs');
+  eq(detectHost({ KITTY_LISTEN_ON: 'unix:/tmp/kitty' }), 'kitty', 'listen socket');
+  eq(detectHost({ KITTY_WINDOW_ID: '7' }), 'kitty', 'window id');
+  eq(detectHost({ TMUX: '1', KITTY_WINDOW_ID: '7' }), 'tmux', 'tmux keeps precedence');
+});
+
+await test('LAN gate exchanges its token for a cookie and strips it from the URL', async () => {
+  const dir = tmpdir('serve-lan-gate');
+  fs.writeFileSync(path.join(dir, 'index.html'), '<h1>LAN</h1>');
+  const { gateLanRequest, serveStatic } = await lib('serve.mjs');
+  const token = 'abcdefghijklmnopqrstuvwx';
+  const local = await serveStatic({ root: dir });
+  const lan = http.createServer(gateLanRequest(token, (req, res) => local.server.emit('request', req, res)));
+  await new Promise((resolve, reject) => { lan.once('error', reject); lan.listen(0, '127.0.0.1', () => resolve()); });
+  const address = lan.address();
+  const port = typeof address === 'object' && address ? address.port : 0;
+  const base = `http://127.0.0.1:${port}/`;
+  const cookieName = `lp_t_${port}`;
+  try {
+    eq((await httpGetRaw(base, '/')).status, 403, 'missing token');
+    eq((await httpGetRaw(base, '/?t=bad')).status, 403, 'bad token');
+    eq((await httpGetRaw(base, '/?t=x')).status, 403, 'wrong-length token does not throw');
+    const accepted = await httpGetRaw(base, '/docs?keep=1&t=' + token);
+    eq(accepted.status, 302, 'good token');
+    eq(accepted.headers.location, '/docs?keep=1', 'token stripped, other query kept');
+    assert(String(accepted.headers['set-cookie']).includes(`${cookieName}=${token}; HttpOnly; SameSite=Strict; Path=/`), 'per-port cookie missing');
+    eq((await httpGetRaw(base, '/', { cookie: `lp_t_1=${token}` })).status, 403, 'another port cookie is rejected');
+    const served = await httpGetRaw(base, '/', { cookie: `${cookieName}=bad; ${cookieName}=${token}` });
+    eq(served.status, 200, 'cookie reaches static server');
+    assert(served.body.includes('<h1>LAN</h1>'), 'static response missing');
+    const safe = await httpGetRaw(base, '/.//evil.com?t=' + token);
+    eq(safe.status, 302, 'dot-segment token accepted');
+    eq(safe.headers.location, '/evil.com', 'redirect remains origin-relative');
+  } finally {
+    lan.close(); lan.closeAllConnections?.();
+    local.server.close(); local.server.closeAllConnections?.();
+  }
+});
+
 await test('textview.layoutText wraps, keeps spans, bullets and rules', async () => {
   const { layoutText } = await lib('textview.mjs');
   const width = 40;
@@ -207,6 +248,7 @@ await test('textview.layoutText wraps, keeps spans, bullets and rules', async ()
     { kind: 'hr', parts: [{ text: '-' }] },
   ];
   const lines = layoutText(blocks, width);
+  // eslint-disable-next-line no-control-regex -- strips terminal color escapes.
   const plain = (l) => l.text.replace(/\x1b\[[0-9;]*m/g, '');
   eq(plain(lines[0]), 'Title', 'first line');
   for (const l of lines) assert(plain(l).length <= width, 'line too wide: ' + JSON.stringify(plain(l)));

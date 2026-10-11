@@ -38,7 +38,7 @@ run and the handful of things that can go wrong.
 
 Four things need to be on the machine. livepeek itself downloads nothing, ever.
 
-- **Node.js** 18 or newer. If Claude Code runs, you have it.
+- **Node.js** 20 or newer.
 - **Chrome or Edge.** livepeek drives the browser you already have instead of downloading one. Windows ships with Edge, so Windows users are covered out of the box.
 - **A terminal that can split and draw graphics**, for the full experience: Windows Terminal 1.22+ (the Windows 11 default), or tmux, Zellij, Kitty or WezTerm on macOS and Linux. Anything else still works with less: `--here` runs in the current pane when the terminal can't split, and terminals that can't draw images get the page as text.
 - **The browser driver**, one npm package, installed once by you:
@@ -153,7 +153,7 @@ to cycle if the probe got it wrong.
 
 ## Supported platforms
 
-What livepeek needs: Node 18 or newer and Chrome or Edge installed. A terminal
+What livepeek needs: Node 20 or newer and Chrome or Edge installed. A terminal
 that can split opens the pane for you; anywhere else, `--here` runs it in the
 current pane. Whether you get a picture or text depends on the terminal.
 "Verified" means driven by hand on that setup for the current release;
@@ -424,7 +424,8 @@ Everything livepeek does, so you can check it before installing. It collects and
 - **Starts a headless Chrome or Edge** that is already installed on your machine, and screenshots it. No browser is downloaded.
 - **Downloads nothing.** The browser driver (`playwright-core`, pinned to 1.63.0) is something you install once with npm; livepeek only looks for it and tells you the command if it is missing.
 - **Serves your files on localhost.** For a plain folder, `.html` or `.md` file it starts a small web server on a random local port. It does not listen on other network interfaces.
-- **Starts your dev server, only if you ask.** Opening a Vite, Next, Expo or similar project runs that project's own `npm run` script, and picking a stopped project in the `p` list does the same.
+- **Shares with a one-time link.** If you explicitly share livepeek's server on your LAN, the QR/link exchanges its one-time token for an HttpOnly cookie before serving files.
+- **Starts your dev server, only if you ask.** Opening a Vite, Next, Expo or similar project runs that project's own `npm run` script, and picking a stopped project in the `p` list does the same. A dev server livepeek starts is stopped when it is replaced or livepeek exits.
 - **Writes a little local state** to `~/.livepeek/`: which panes are open (`panes/`, one small file per terminal), the folders you have previewed (`projects.json`), and whether the first-run welcome card still needs showing (`intro.json`). On first use, an existing `~/.peek/` is migrated when the new directory does not yet exist. Delete the folder to clear it.
 - **Sends nothing anywhere.** No telemetry, no analytics, no account, no outbound requests of its own. The pages you preview make whatever requests they normally would.
 - **Has no hooks and no MCP server.** It adds one skill and one optional `livepeek` shell command.

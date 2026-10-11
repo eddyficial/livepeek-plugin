@@ -25,7 +25,7 @@ export function lanAddresses(ifaces = os.networkInterfaces()) {
   for (const [name, list] of Object.entries(ifaces || {})) {
     if (VIRTUAL.test(name)) continue;
     for (const i of list || []) {
-      const v4 = i.family === 'IPv4' || i.family === 4;
+      const v4 = i.family === 'IPv4';
       if (!v4 || i.internal || i.address.startsWith('169.254.')) continue;
       found.push({ name, address: i.address });
     }
