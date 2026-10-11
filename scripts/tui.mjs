@@ -1237,7 +1237,7 @@ kbd{font-family:inherit;border:1px solid #3a3f4a;border-bottom-width:2px;border-
 .go{align-self:flex-start;margin-top:.4em;background:#2563eb;color:#fff;border-radius:999px;padding:.45em 1.1em;font-size:.9em;font-weight:600}
 </style></head><body>
 <div class="pick"><div class="arrow">&#8593;</div><div><b>Pick a device up here</b>
-<div class="chips"><span>phone</span><span>tablet</span><span>desktop</span><span>game</span></div></div></div>
+<div class="chips"><span>phone</span><span>tablet</span><span>desktop</span></div></div></div>
 <main><h1>Welcome to livepeek</h1>
 <p>This pane shows your project, live. Save a file and it updates here.</p>
 <p>Click and scroll go to the page. <kbd>space</kbd> opens the device list, <kbd>shift</kbd>+<kbd>?</kbd> lists every key.</p>
