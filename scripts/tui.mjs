@@ -33,6 +33,7 @@ import { probeTerminal, pickRenderer } from './lib/caps.mjs';
 import * as session from './lib/session.mjs';
 import { serveStatic } from './lib/serve.mjs';
 import * as projects from './lib/projects.mjs';
+import * as intro from './lib/intro.mjs';
 import { EXTRACT, layoutText } from './lib/textview.mjs';
 import { findDriver } from './lib/driver.mjs';
 import { encodePng } from './lib/pngenc.mjs';
@@ -636,15 +637,15 @@ function drawFooter(L) {
   // the pane up a row. Leave a margin, and switch autowrap off while drawing.
   const budget = L.cols - plainState.length - 8;
   // In a narrow pane, drop the least important items first rather than cut
-  // the line off at the end - help and quit are the two a user cannot do
-  // without, so they are the last to go.
+  // the line off at the end. Quit is the last to go, then the device picker
+  // (the header looks like a label until you know it is a menu), then help.
   const sep = '  ·  ';
   const items = typing
     ? ['keys go to the page', 'esc to stop typing', 'ctrl+c quits']
     : [renderMode, 'i type', 'p project', 'space device', 'shift+? help', 'q quit'];
   if (!typing && errors.length) items.unshift(C.bad(`${errors.length} error${errors.length === 1 ? '' : 's'}  e`));
   // most important first; the error badge, when present, is index 0 and wins
-  const order = typing ? [2, 1, 0] : errors.length ? [0, 6, 5, 4, 3, 2, 1] : [5, 4, 3, 2, 1, 0];
+  const order = typing ? [2, 1, 0] : errors.length ? [0, 6, 4, 5, 3, 2, 1] : [5, 3, 4, 2, 1, 0];
   let chosen = [];
   for (const i of order) {
     const next = [...chosen, i].sort((x, y) => x - y);
@@ -942,6 +943,7 @@ async function paint(force) {
       }
       render(L, shot);
       if (menuOpen) drawMenu(L);
+      if (overlay) drawOverlay(L);   // a new frame paints over it otherwise
     }
     statusMsg = 'live';
   } catch (e) {
@@ -971,7 +973,18 @@ function cellToPage(col, row) {
 }
 
 async function handleMouse(code, col, row, press) {
-  if (overlay) { if (press) { closeOverlay(); await tick(true); } return; }
+  if (overlay) {
+    // Motion arrives as a press too while any-motion reporting is on; only a
+    // real click closes an overlay. Clicking the device name from the intro
+    // goes straight to the picker it was pointing at.
+    if (!press || (code & 32)) return;
+    const onHeader = headerHit && row === headerHit.row && col >= headerHit.col0 && col <= headerHit.col1 && (code & 3) === 0;
+    const wasIntro = overlay.kind === 'intro';
+    closeOverlay();
+    if (wasIntro && onHeader) { openMenu(); return; }
+    await tick(true);
+    return;
+  }
   // menu takes precedence while it's open
   if (menuOpen) {
     const inMenu = menuBox && row >= menuBox.top && row < menuBox.top + menuBox.height
@@ -1145,28 +1158,63 @@ const HELP = [
   ['',        ''],
   ['mouse',   'click, drag, scroll and hover all go to the page'],
 ];
+// Shown to a new user over the top-left of the page, just under the header,
+// so its arrows point at the device name. Paragraphs are wrapped to the pane.
+const INTRO = [
+  'This is your project, live. Save a file and it updates here.',
+  '',
+  '↑ Click the name above, or press space, to see it as a phone, tablet, desktop or game screen.',
+  '',
+  'Clicks and scrolling go to the page. shift+? lists every key.',
+];
+
+/** Greedy word wrap; a word longer than the width is cut when drawn. */
+function wrap(text, width) {
+  const lines = [];
+  let line = '';
+  for (const word of text.split(' ')) {
+    if (line && (line + ' ' + word).length > width) { lines.push(line); line = word; }
+    else line = line ? line + ' ' + word : word;
+  }
+  lines.push(line);
+  return lines;
+}
+
 function drawOverlay(L) {
   if (!overlay) return;
   const width = Math.min(L.cols - 2, 72);
-  out(`${ESC}[2;2H${C.head((' ' + overlay.title + ' ').padEnd(width))}`);
-  overlay.rows.forEach(([k, d], i) => {
-    const line = `  ${k.padEnd(7)} ${d}`.padEnd(width).slice(0, width);
+  let lines = overlay.kind === 'intro'
+    ? overlay.text.flatMap(p => wrap(p, width - 4).map(l => '  ' + l))
+    : overlay.rows.map(([k, d]) => `  ${k.padEnd(7)} ${d}`);
+  // title on row 2, the action line under the last row, and the pane's own
+  // footer on the bottom row must all survive a short pane
+  lines = lines.slice(0, Math.max(1, L.rows - 4));
+  out(`${ESC}[2;2H${C.head((' ' + overlay.title + ' ').padEnd(width).slice(0, width))}`);
+  lines.forEach((text, i) => {
+    const line = text.padEnd(width).slice(0, width);
     out(`${ESC}[${3 + i};2H${ESC}[48;5;236m${ESC}[38;5;252m${line}${ESC}[0m`);
   });
-  out(`${ESC}[${3 + overlay.rows.length};2H${ESC}[48;5;236m${ESC}[38;5;245m${'  any key to close'.padEnd(width)}${ESC}[0m`);
+  const action = overlay.kind === 'intro' ? '  any key or click to start' : '  any key to close';
+  out(`${ESC}[${3 + lines.length};2H${ESC}[48;5;236m${ESC}[38;5;245m${action.padEnd(width).slice(0, width)}${ESC}[0m`);
+  overlay.height = lines.length + 2;   // what closeOverlay has to wipe
 }
 function openOverlay(title, rows) {
-  overlay = { title, rows };
+  overlay = { kind: 'table', title, rows };
+  drawOverlay(lastLayout || layout());
+}
+function openIntro() {
+  overlay = { kind: 'intro', title: '↑ welcome to livepeek', text: INTRO };
   drawOverlay(lastLayout || layout());
 }
 function closeOverlay() {
   if (!overlay) return;
-  const n = overlay.rows.length + 2;
+  const n = overlay.height || (overlay.rows ? overlay.rows.length + 2 : 4);
   overlay = null;
   uncover(n);
 }
 
 function openMenu(mode = 'preset') {
+  if (mode === 'preset') intro.picked();
   menuMode = mode;
   menuOpen = true;
   // start on whatever is currently active in this list
@@ -1524,6 +1572,16 @@ async function main() {
 
   // one loop drives both the repaint and the shared-pane check
   tickTimer = setInterval(() => { tick(); checkControl(); }, INTERVAL);
+
+  // A new user gets told what the pane is and where the device menu is. The
+  // delay lets the first frame land; tick() redraws the card over any later one.
+  if (intro.due()) {
+    setTimeout(() => {
+      if (overlay || menuOpen || typing || !intro.due()) return;
+      intro.shown();
+      openIntro();
+    }, 900);
+  }
   clearInterval(startBeat);       // tick keeps the heartbeat from here on
   // Dragging a pane border fires resize dozens of times; only the size it
   // settles on is worth a viewport change. A failure here has nobody above it
@@ -1563,6 +1621,7 @@ async function main() {
     // picker they are ignored rather than falling through - alt+arrow in
     // particular belongs to the terminal, not to us.
     if (ev.t === 'key') {
+      if (overlay && !ev.alt && !ev.ctrl) { closeOverlay(); return tick(true); }   // "any key"
       if (!menuOpen || ev.alt || ev.ctrl) return;
       const step = menuBox?.count || 5;   // not `page` - that is the browser page
       if (ev.name === 'ArrowDown') return menuMove(1);
@@ -1577,7 +1636,13 @@ async function main() {
     const k = ev.ch;
     if (ev.alt) return;                 // alt+letter is not one of our bindings
 
-    if (overlay) { closeOverlay(); return tick(true); }
+    if (overlay) {
+      // the intro says "press space", so space goes where it pointed
+      const toPicker = overlay.kind === 'intro' && k === ' ';
+      closeOverlay();
+      if (toPicker) { lastSpaceAt = ev.at || Date.now(); openMenu('preset'); return; }
+      return tick(true);
+    }
 
     // while the device picker is open, letters narrow the list. Space still
     // closes an untouched picker, but once a filter is started it is part of

@@ -15,9 +15,9 @@ author or to anyone else.
   browser tab would. livepeek adds no requests of its own.
 - **Local ports.** It checks whether a dev server is listening on
   `127.0.0.1` / `::1`, and its built-in file server only listens locally.
-- **`~/.livepeek/`.** A small state folder: the open pane's session, and the
-  list of project folders you have viewed (for the `p` switcher). Delete the
-  folder to clear it.
+- **`~/.livepeek/`.** A small state folder: the open pane's session, the
+  list of project folders you have viewed (for the `p` switcher), and whether
+  the first-run intro still needs showing. Delete the folder to clear it.
 - **Snapshots.** `--snapshot` writes a PNG to the path you give it. `c` copies the current frame to your
   clipboard, through a temporary file.
 
