@@ -43,7 +43,7 @@ if (flag('--doctor')) {
 // status line or for Claude to read the page's error count. Read-only, so it
 // runs before any project detection.
 if (flag('--status')) {
-  const r = session.resolve();
+  const r = session.resolve(projectDirs());
   if (!r.pane) {
     console.error(noPaneMessage(r.error));
     process.exit(1);
@@ -57,7 +57,7 @@ if (flag('--status')) {
 // --picked: the element the user last pointed at in the pane (x, then a
 // click), as JSON. This is how Claude resolves "this" in "make this bigger".
 if (flag('--picked')) {
-  const r = session.resolve();
+  const r = session.resolve(projectDirs());
   if (!r.pane) {
     console.error(noPaneMessage(r.error));
     process.exit(1);
@@ -100,6 +100,11 @@ function findProjectRoot(from = process.cwd()) {
     if (up === dir) return null;
     dir = up;
   }
+}
+
+/** The folders that mean "this project" to a control command. */
+function projectDirs() {
+  return [findProjectRoot() || process.cwd(), process.cwd()];
 }
 
 const root = findProjectRoot() || process.cwd();
@@ -221,6 +226,7 @@ const previewCmd = [
   '--interval', String(INTERVAL),
   '--host', detectHost() || 'none',
   '--slot', session.SLOT,
+  '--root', root,
   ...(arg('--render', null) ? ['--render', arg('--render', null)] : []),
   ...(welcome ? ['--watch-dir', process.cwd()] : []),
   ...serveArgs,
@@ -306,11 +312,14 @@ const splitters = {
 async function main() {
   let open = session.current();
   let weHoldClaim = false;
-  // Control commands may reach a pane this terminal did not open, if it is
-  // the only one (a --here view in a split the user made by hand).
+  // Control commands may reach a pane this terminal did not open: one
+  // another terminal opened on this project (not for --quit), or the only
+  // one there is (a --here view in a split the user made by hand).
   const control = flag('--quit') || arg('--eval', null) || (SNAPSHOT && argv.length <= 2);
   let why = null;
-  if (control && !open) { const r = session.resolve(); open = r.pane || null; why = r.error; }
+  // --quit stays with this terminal's own pane first: closing a view someone
+  // else is looking at, and leaving this one open, is never what was meant
+  if (control) { const r = session.resolve(flag('--quit') ? [] : projectDirs()); open = r.pane || null; why = r.error; }
 
   // --quit closes the pane cleanly from outside. Killing the process instead
   // makes it exit non-zero, and Windows Terminal keeps a pane open on an
@@ -390,6 +399,7 @@ async function main() {
     session.write({
       ...open,
       target: STATIC ? null : TARGET,
+      root,
       // a dev-server project: the open pane has to start its server, or the
       // page it navigates to is empty (or someone else's)
       serve: serveArgs[0] === '--serve' ? { script: fw.script, cwd: root, port: PORT } : null,

@@ -85,6 +85,9 @@ if (SLOT_ARG) {
 // look at the pane. Also requestable after the fact via the session file.
 const SNAPSHOT = arg('--snapshot', null);
 const WATCH_DIR = arg('--watch-dir', null);   // welcome page: switch when this folder gets content
+// the project folder on show, published so a control command run from that
+// project finds this pane even when another terminal opened it
+let shownRoot = arg('--root', null);
 
 // -------------------------------------------------------------- presets ----
 function loadPresets() {
@@ -408,6 +411,7 @@ function publish(extra = {}) {
     pid: process.pid,
     host: HOST,
     target: currentTarget,
+    root: shownRoot,
     preset: devices[deviceIdx]?.id,
     rev: myRev,
     snapshotDone,
@@ -495,6 +499,9 @@ async function applyControl(s) {
   if (s.snapshot && s.target === currentTarget && s.preset === devices[deviceIdx]?.id && !s.static && !s.serve) {
     return takeSnapshot();
   }
+
+  // every request carries the last published root; a retarget brings its own
+  if (s.root !== undefined) shownRoot = s.root;
 
   if (s.preset) {
     const i = devices.findIndex(d => d.id === s.preset);
@@ -961,6 +968,7 @@ async function menuSelect(pos) {
     const t = targets[idx];
     closeMenu();
     if (!t) return tick(true);
+    shownRoot = t.dir || null;
 
     if (t.static) {
       // a folder or a document: livepeek serves it itself
@@ -1601,7 +1609,7 @@ async function goTo(text) {
   // another server is another project: make it the pane's target, as p would
   let sameServer = false;
   try { sameServer = new URL(href).origin === new URL(currentTarget).origin; } catch { /* no current target */ }
-  if (!sameServer) { currentTarget = new URL(href).origin + '/'; publishIfIdle(); }
+  if (!sameServer) { currentTarget = new URL(href).origin + '/'; shownRoot = null; publishIfIdle(); }
   statusMsg = 'loading';
   drawFooter(lastLayout || layout());
   await exclusive(async () => {

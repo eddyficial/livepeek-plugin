@@ -178,27 +178,52 @@ function claimed() {
 
 /**
  * The pane a control command (--snapshot, --eval, --quit, --status) should
- * talk to: this slot's own, or else the only live pane there is - a pane the
- * user started with --here in a split they made by hand belongs to that
- * split's slot, not to the session asking. Switches this process to the
+ * talk to: the pane showing the project it was run from, else this slot's
+ * own, else the only live pane there is - a pane the user started with --here
+ * in a split they made by hand belongs to that split's slot, not to the
+ * session asking. `dirs` are the folders that count as "this project" (the
+ * project root and the working directory). Switches this process to the
  * chosen slot. Returns { pane } or { error } when there is none or several.
  */
-export function resolve() {
+export function resolve(dirs = []) {
   const own = current();
-  if (own) return { pane: own };
+  const want = dirs.filter(Boolean).map(sameDir);
+  const shows = (st) => !!st?.root && want.includes(sameDir(st.root));
+  if (own && (!want.length || shows(own))) return { pane: own };
   // our own pane is on its way up; do not send its requests elsewhere
-  if (claimed()) return { error: 'starting' };
+  if (!own && claimed()) return { error: 'starting' };
   let names = [];
   try { names = fs.readdirSync(PANES).filter(n => n.endsWith('.json')); } catch { /* none yet */ }
-  const live = names.map(n => n.slice(0, -5)).filter(validSlot).filter(slot => {
+  const live = names.map(n => n.slice(0, -5)).filter(validSlot).filter(slot => slot !== SLOT).filter(slot => {
     const p = filesFor(slot);
     const st = readFile(p.file);
     return st && alive(st.pid) && beating(p.beat);
   });
+  // A pane another terminal opened on this project is the one meant: Claude
+  // working in the project asks about the view of it, not about whatever
+  // this terminal's own pane happens to show.
+  const onProject = live.filter(slot => shows(readFile(filesFor(slot).file)));
+  if (onProject.length === 1) {
+    const back = SLOT;
+    useSlot(onProject[0]);
+    const pane = current();
+    if (pane) return { pane };
+    useSlot(back);
+  }
+  if (own) return { pane: own };
   if (live.length === 1) {
+    const back = SLOT;
     useSlot(live[0]);
     const pane = current();          // read once more: it may have closed meanwhile
-    return pane ? { pane } : { error: 'none' };
+    if (pane) return { pane };
+    useSlot(back);
+    return { error: 'none' };
   }
   return { error: live.length ? 'several' : 'none' };
+}
+
+/** A folder path in a form two spellings of it compare equal in. */
+function sameDir(dir) {
+  const p = path.resolve(dir).replace(/[\\/]+$/, '');
+  return process.platform === 'win32' ? p.toLowerCase() : p;
 }

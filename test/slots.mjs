@@ -21,9 +21,9 @@ const session = await lib('session.mjs');
 const PANES = path.join(HOME, '.livepeek', 'panes');
 
 /** Fake a live pane in a slot: this test process's pid and a fresh heartbeat. */
-function fakePane(slot, preset) {
+function fakePane(slot, preset, root = null) {
   fs.mkdirSync(PANES, { recursive: true });
-  fs.writeFileSync(path.join(PANES, slot + '.json'), JSON.stringify({ pid: process.pid, host: 'wt', target: 'http://x/', preset, errors: 2 }));
+  fs.writeFileSync(path.join(PANES, slot + '.json'), JSON.stringify({ pid: process.pid, host: 'wt', target: 'http://x/', root, preset, errors: 2 }));
   fs.writeFileSync(path.join(PANES, slot + '.alive'), '');
 }
 const reset = () => fs.rmSync(PANES, { recursive: true, force: true });
@@ -60,6 +60,33 @@ await test('--status falls back to the only pane, and refuses to guess between s
   r = run('pane.mjs', ['--status'], { LIVEPEEK_SLOT: 'nobody' });
   eq(r.status, 1, 'several\n' + r.out);
   assert(r.out.includes('several livepeek panes'), r.out);
+});
+
+await test('control commands go to the pane showing this project, even one another terminal opened', () => {
+  reset();
+  const mine = session.slotFromEnv({ LIVEPEEK_SLOT: 'mine' });
+  const other = session.slotFromEnv({ LIVEPEEK_SLOT: 'other' });
+  fakePane(mine, 'fit', path.join(HOME, 'elsewhere'));
+  // on Windows, in another spelling of the same folder
+  const here = tmpdir('slots') + path.sep;
+  fakePane(other, 'pixel-9', process.platform === 'win32' ? here.toUpperCase() : here);
+  let r = run('pane.mjs', ['--status'], { LIVEPEEK_SLOT: 'mine' });
+  eq(r.status, 0, 'exit\n' + r.out);
+  eq([JSON.parse(r.out).slot, JSON.parse(r.out).preset], [other, 'pixel-9'], 'project pane');
+  // this terminal's own pane still wins when it shows this project too
+  fakePane(mine, 'fit', tmpdir('slots'));
+  r = run('pane.mjs', ['--status'], { LIVEPEEK_SLOT: 'mine' });
+  eq(JSON.parse(r.out).slot, mine, 'own pane on the same project');
+  // and when no pane shows this project, it is the own pane as before
+  fakePane(mine, 'fit', null);
+  fakePane(other, 'pixel-9', path.join(HOME, 'elsewhere'));
+  r = run('pane.mjs', ['--status'], { LIVEPEEK_SLOT: 'mine' });
+  eq(JSON.parse(r.out).slot, mine, 'own pane otherwise');
+  // --quit never closes another terminal's view in place of this one's
+  fakePane(other, 'pixel-9', here);
+  run('pane.mjs', ['--quit'], { LIVEPEEK_SLOT: 'mine' });
+  const quit = (slot) => !!JSON.parse(fs.readFileSync(path.join(PANES, slot + '.json'), 'utf8')).quit;
+  eq([quit(mine), quit(other)], [true, false], '--quit closes the own pane');
 });
 
 await test('--status does not fall back while this terminal\'s own pane is starting', () => {
