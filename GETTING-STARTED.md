@@ -70,11 +70,16 @@ A new pane beside your work, containing your app. At the top, the viewport
 name. At the bottom, a status line like:
 
 ```
-live   sixel · i type · click name to switch · o rotate · b render · q quit
+live  space device  ·  shift+? help  ·  q quit
 ```
 
-`live` means it's updating. `sixel` is the renderer in use; more on that
-below if things look wrong.
+`live` means it's updating; `shift`+`?` lists every key. In a wider pane the
+footer also names the renderer in use; more on that below if things look wrong.
+
+The first few times (when the pane draws a picture rather than text), a welcome card points at the device name in the top
+left. Click it, or press `space`, to open the device picker; any other click
+or plain key dismisses it. It stops appearing once you have used the picker, or after
+three launches.
 
 For a **phone** project you'll see an actual phone body drawn around the
 screen. For a **website** or **game** you'll see just the viewport with a thin
@@ -85,10 +90,10 @@ building: a phone frame around it would misrepresent it.
 
 You do not have to be in a Claude session. Copy a wrapper from the installed
 plugin cache into a folder on your PATH. With the default Claude configuration,
-version 0.5.0 is under:
+version 0.6.0 is under:
 
 ```
-~/.claude/plugins/cache/livepeek/livepeek/0.5.0/bin/
+~/.claude/plugins/cache/livepeek/livepeek/0.6.0/bin/
 ```
 
 On Windows, copy `livepeek.cmd`. On macOS or Linux, copy `livepeek` and make it
@@ -134,7 +139,8 @@ Once it's focused:
 
 In the viewport picker, `↑`/`↓` move the selection and `enter` picks it.
 `PageUp`/`PageDown` jump a screenful, `Home`/`End` go to the ends, `esc`
-closes. Clicking works too.
+closes. The mouse works too: scroll the list with the wheel, click to pick.
+Type to filter by name or maker: `sam`, `pixel`, `apple`, `desk`.
 
 Alt+arrow and ctrl+arrow are deliberately left alone so your terminal still
 gets them; that's usually how you move between panes.

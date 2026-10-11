@@ -68,10 +68,10 @@ top-level `bin/` is on its PATH.
 
 For PowerShell, cmd, or shells outside Claude Code, copy a wrapper from the
 installed plugin cache into a folder on your PATH. With the default Claude
-configuration, the v0.5.0 wrappers are here:
+configuration, the v0.6.0 wrappers are here:
 
 ```
-~/.claude/plugins/cache/livepeek/livepeek/0.5.0/bin/
+~/.claude/plugins/cache/livepeek/livepeek/0.6.0/bin/
 ```
 
 These examples use `$HOME\bin` on Windows and `~/.local/bin` on macOS and
@@ -81,14 +81,14 @@ Windows PowerShell:
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\bin" | Out-Null
-Copy-Item "$HOME\.claude\plugins\cache\livepeek\livepeek\0.5.0\bin\livepeek.cmd" "$HOME\bin\livepeek.cmd"
+Copy-Item "$HOME\.claude\plugins\cache\livepeek\livepeek\0.6.0\bin\livepeek.cmd" "$HOME\bin\livepeek.cmd"
 ```
 
 macOS or Linux:
 
 ```bash
 mkdir -p ~/.local/bin
-cp ~/.claude/plugins/cache/livepeek/livepeek/0.5.0/bin/livepeek ~/.local/bin/livepeek
+cp ~/.claude/plugins/cache/livepeek/livepeek/0.6.0/bin/livepeek ~/.local/bin/livepeek
 chmod +x ~/.local/bin/livepeek
 ```
 
@@ -120,7 +120,9 @@ Every option in [Options](#options) works the same way.
 fixed size such as `desktop` (1440×900) or `document` (900×1200) is one
 `--preset` away.
 
-Phones get a drawn phone body, bezel and camera cutout. Web, game and document
+Phones get a drawn phone body, bezel and camera cutout, with a status bar above
+the page the way a real phone has one, so the cutout never covers your header.
+The viewport stays its true size. Web, game and document
 viewports are drawn bare, because a browser viewport or a game canvas *is* the
 thing you're building: a phone frame around it would be a lie.
 
@@ -143,8 +145,8 @@ startup, never assumed:
 | text | terminals that can't draw images (the automatic fallback) | the page laid out as readable text; see Terminals |
 | half-blocks | anything with truecolor | coarse picture; pick it with `b` |
 
-The footer names the active renderer. Press `b` to cycle if the probe got it
-wrong.
+The footer names the active renderer when the pane is wide enough. Press `b`
+to cycle if the probe got it wrong.
 
 ## Supported platforms
 
@@ -201,6 +203,10 @@ set -g allow-passthrough on
 
 **No graphics? You get the page as text.** Some hosts cannot draw images at all (Zellij on Windows is one; it passes the terminal's sixel reply through but renders nothing). There livepeek lays the page out as text instead: headings, paragraphs, lists, links and buttons, wrapped to the pane. Scrolling scrolls, clicking a link or button clicks it, `i` types into a focused field. It is a reader, not a picture, so layout and colour are gone, but every word is legible. `b` cycles kitty, sixel, text and half-blocks if the automatic choice is wrong. For a sharp picture on Windows, run livepeek from a Windows Terminal pane directly.
 
+In Windows Terminal the pane is split into the window you used most recently
+(`wt -w 0`). With several Windows Terminal windows open, run livepeek from the
+one you want it in, or click into that window first.
+
 One pane follows you between terminals too. If you open livepeek in Windows
 Terminal, then move into Zellij and run it again, the old pane is closed and a
 fresh one opens where you are now.
@@ -228,7 +234,14 @@ Focus the pane first: `alt`+arrow in most terminals, `prefix`+arrow in tmux.
 | `q` | quit and close the pane |
 
 In the preset picker: `↑`/`↓` move, `PageUp`/`PageDown` jump, `Home`/`End` go
-to the ends, `enter` selects, `esc` closes.
+to the ends, `enter` selects, `esc` closes. The mouse wheel scrolls the list and
+a click picks. With kitty or sixel graphics the picker is drawn as a panel with
+a search field and a small outline of each device; in text or half-block mode,
+or a very short pane, it is a plain list.
+
+In picture modes, the first few launches show a welcome card pointing at the device name in the
+header; clicking the name opens the picker. The card stops appearing once you
+have used the picker, or after three launches.
 
 Anything with alt or ctrl held is left alone, so your terminal's own bindings
 still work; alt+arrow moves between panes rather than reaching the viewer.
@@ -332,7 +345,7 @@ Everything livepeek does, so you can check it before installing. It collects and
 - **Downloads nothing.** The browser driver (`playwright-core`, pinned to 1.63.0) is something you install once with npm; livepeek only looks for it and tells you the command if it is missing.
 - **Serves your files on localhost.** For a plain folder, `.html` or `.md` file it starts a small web server on a random local port. It does not listen on other network interfaces.
 - **Starts your dev server, only if you ask.** Opening a Vite, Next, Expo or similar project runs that project's own `npm run` script, and picking a stopped project in the `p` list does the same.
-- **Writes a little local state** to `~/.livepeek/`: which pane is open, and the folders you have previewed (`projects.json`). On first use, an existing `~/.peek/` is migrated when the new directory does not yet exist. Delete the folder to clear it.
+- **Writes a little local state** to `~/.livepeek/`: which pane is open, the folders you have previewed (`projects.json`), and whether the first-run welcome card still needs showing (`intro.json`). On first use, an existing `~/.peek/` is migrated when the new directory does not yet exist. Delete the folder to clear it.
 - **Sends nothing anywhere.** No telemetry, no analytics, no account, no outbound requests of its own. The pages you preview make whatever requests they normally would.
 - **Has no hooks and no MCP server.** It adds one skill and one optional `livepeek` shell command.
 - **Clipboard, only when you press `c`.** Copying a frame uses PowerShell on Windows, `osascript` on macOS, and `wl-copy` or `xclip` on Linux. Nothing is read from the clipboard.
@@ -365,6 +378,8 @@ scripts/
   lib/projects.mjs folders previewed before, for the `p` picker
   lib/state.mjs   the ~/.livepeek directory (and one-time ~/.peek migration)
   lib/textview.mjs text renderer for hosts that cannot draw images
+  lib/menuview.mjs the device picker drawn as a picture
+  lib/intro.mjs   when to show the first-run welcome card
 ```
 
 ## Licence
