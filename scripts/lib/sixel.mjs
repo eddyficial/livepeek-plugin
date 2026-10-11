@@ -12,37 +12,38 @@ const ESC = '\x1b';
  * Quantise to at most `max` colours.
  *
  * UI screenshots are mostly large flat regions, so a frequency histogram over
- * 5-bit-per-channel buckets captures almost everything exactly; the nearest-
- * colour search only runs for the rare leftover shades, and is memoised.
+ * 6-bit-per-channel buckets captures almost everything; the nearest-colour
+ * search only runs for the rare leftover shades, and is memoised. Each
+ * palette entry is the mean of the pixels in its bucket rather than the
+ * bucket's corner, which used to round every colour down: backgrounds came
+ * out darker than the page and anti-aliased text lost its middle greys.
  */
 function quantise(img, max = 128) {
   const { data } = img;
-  const counts = new Map();
+  const key6 = (i) => ((data[i] >> 2) << 12) | ((data[i + 1] >> 2) << 6) | (data[i + 2] >> 2);
+  const buckets = new Map();      // key -> [r, g, b, count]
 
   for (let i = 0; i < data.length; i += 3) {
-    const key = ((data[i] >> 3) << 10) | ((data[i + 1] >> 3) << 5) | (data[i + 2] >> 3);
-    counts.set(key, (counts.get(key) || 0) + 1);
+    const key = key6(i);
+    let acc = buckets.get(key);
+    if (!acc) buckets.set(key, acc = [0, 0, 0, 0]);
+    acc[0] += data[i]; acc[1] += data[i + 1]; acc[2] += data[i + 2]; acc[3]++;
   }
 
-  const palette = [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, max)
-    .map(([key]) => [
-      ((key >> 10) & 31) << 3,
-      ((key >> 5) & 31) << 3,
-      (key & 31) << 3,
-    ]);
-
+  const top = [...buckets.entries()].sort((x, y) => y[1][3] - x[1][3]).slice(0, max);
+  const palette = top.map(([, acc]) => [
+    Math.round(acc[0] / acc[3]), Math.round(acc[1] / acc[3]), Math.round(acc[2] / acc[3]),
+  ]);
   if (!palette.length) palette.push([0, 0, 0]);
 
-  const cache = new Map();
+  // buckets that made the palette map to themselves; the rest are looked up
+  const cache = new Map(top.map(([key], i) => [key, i]));
   const lookup = (key) => {
     let idx = cache.get(key);
     if (idx !== undefined) return idx;
 
-    const r = ((key >> 10) & 31) << 3;
-    const g = ((key >> 5) & 31) << 3;
-    const b = (key & 31) << 3;
+    const acc = buckets.get(key);
+    const r = acc[0] / acc[3], g = acc[1] / acc[3], b = acc[2] / acc[3];
 
     let best = 0, bestD = Infinity;
     for (let i = 0; i < palette.length; i++) {
@@ -56,9 +57,7 @@ function quantise(img, max = 128) {
 
   // index every pixel once
   const indexed = new Uint8Array(data.length / 3);
-  for (let i = 0, p = 0; i < data.length; i += 3, p++) {
-    indexed[p] = lookup(((data[i] >> 3) << 10) | ((data[i + 1] >> 3) << 5) | (data[i + 2] >> 3));
-  }
+  for (let i = 0, p = 0; i < data.length; i += 3, p++) indexed[p] = lookup(key6(i));
 
   return { palette, indexed };
 }

@@ -126,3 +126,31 @@ export function resize(img, dw, dh) {
   }
   return { width: dw, height: dh, data: out };
 }
+
+/**
+ * Unsharp mask over the four direct neighbours. Windows Terminal draws a
+ * sixel on a virtual grid of 10x20 pixels per cell and stretches it to the
+ * real cell size, which on a high-DPI screen softens text noticeably; the
+ * box-filter downscale above softens it a little more. Restoring some edge
+ * contrast first keeps small text readable through the stretch.
+ */
+export function sharpen(img, amount) {
+  if (!(amount > 0)) return img;
+  const { width: w, height: h, data: src } = img;
+  const out = Buffer.allocUnsafe(src.length);
+  const row = w * 3;
+  for (let y = 0; y < h; y++) {
+    const up = y > 0 ? -row : 0, down = y < h - 1 ? row : 0;
+    for (let x = 0; x < w; x++) {
+      const left = x > 0 ? -3 : 0, right = x < w - 1 ? 3 : 0;
+      const p = (y * w + x) * 3;
+      for (let c = p; c < p + 3; c++) {
+        const v = src[c];
+        const blur = (src[c + left] + src[c + right] + src[c + up] + src[c + down] + 4 * v) / 8;
+        const s = v + amount * (v - blur);
+        out[c] = s < 0 ? 0 : s > 255 ? 255 : s;
+      }
+    }
+  }
+  return { width: w, height: h, data: out };
+}

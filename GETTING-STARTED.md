@@ -90,10 +90,10 @@ building: a phone frame around it would misrepresent it.
 
 You do not have to be in a Claude session. Copy a wrapper from the installed
 plugin cache into a folder on your PATH. With the default Claude configuration,
-version 0.6.1 is under:
+version 0.6.2 is under:
 
 ```
-~/.claude/plugins/cache/livepeek/livepeek/0.6.1/bin/
+~/.claude/plugins/cache/livepeek/livepeek/0.6.2/bin/
 ```
 
 On Windows, copy `livepeek.cmd`. On macOS or Linux, copy `livepeek` and make it

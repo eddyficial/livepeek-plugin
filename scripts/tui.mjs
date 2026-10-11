@@ -26,7 +26,8 @@ import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
-import { decodePng, resize } from './lib/png.mjs';
+import { AsyncLocalStorage } from 'node:async_hooks';
+import { decodePng, resize, sharpen } from './lib/png.mjs';
 import { toSixel, toHalfBlocks } from './lib/sixel.mjs';
 import { toKitty, tmuxWrap, kittyClearAll } from './lib/kitty.mjs';
 import { probeTerminal, pickRenderer } from './lib/caps.mjs';
@@ -241,6 +242,11 @@ let paused = false;
 // of 'sixel' painted garbage on terminals that cannot render it
 let renderMode = 'blocks';
 let dirty = true;
+// Bumped whenever the layout changes (device, rotation, pane size, renderer).
+// A tick already waiting on a screenshot when that happens holds the old
+// layout; painting it after the new one's clear leaves the old, wider picture
+// showing around the new one. paint() drops a frame whose generation is stale.
+let viewGen = 0;
 let lastLayout = null;
 
 // When typing, every keystroke goes to the page instead of the viewer - which
@@ -411,7 +417,9 @@ function publishIfIdle() {
 async function checkControl() {
   // One request at a time. A retarget can sit in startDevServer for a minute
   // and a half; a newer request waits for the next tick after it finishes.
-  if (controlBusy) return;
+  // Nor while a frame is being taken: navigating under a screenshot in flight
+  // leaves it stuck, and Playwright queues every later one behind it.
+  if (controlBusy || ticking) return;
   const s = session.read();
   if (!s || s.pid !== process.pid || s.rev === myRev) return;
 
@@ -420,11 +428,15 @@ async function checkControl() {
   // that occasionally captured the new page at the old page's layout size.
   // Hold the render loop off until the whole sequence has settled.
   controlBusy = true;
-  try { await applyControl(s); }
+  try { await controlScope.run(true, () => applyControl(s)); }
   catch (e) { publish({ error: String(e.stack || e.message || e).slice(0, 600) }); }
   finally { controlBusy = false; }
 }
 let controlBusy = false;
+// Marks the paints a control request asks for itself. While one is running,
+// only those may take a screenshot: a click or a resize forcing a frame in
+// the middle of its navigation would stall that frame for seconds.
+const controlScope = new AsyncLocalStorage();
 
 async function applyControl(s) {
 
@@ -569,6 +581,7 @@ async function applySize(rows, cols) {
   if (rows === L.rows && cols === L.cols) return;
   probedSize = { rows, cols };
   menuKey = null;                   // an in-flight picker render is the old size
+  viewGen++;
   dirty = true; lastShot = null; lastTextKey = '';
   await tick(true);
 }
@@ -957,6 +970,8 @@ function cycleRenderer() {
   const order = ['kitty', 'sixel', 'text', 'blocks'];
   renderMode = order[(order.indexOf(renderMode) + 1) % order.length];
   lastShot = null; lastTextKey = ''; textScroll = 0;
+  menuKey = null;         // an in-flight picker render is in the old renderer
+  viewGen++;
   dirty = true;
 }
 
@@ -971,7 +986,11 @@ function render(L, shotPng) {
   const geom = L.geom;
   const sw = Math.max(1, Math.round(geom.screenW * L.scale));
   const sh = Math.max(1, Math.round(geom.screenH * L.scale));
-  const shot = resize(decodePng(shotPng), sw, sh);
+  let shot = resize(decodePng(shotPng), sw, sh);
+  // Sixel only: kitty graphics are drawn at real pixels and stay sharp.
+  // Windows Terminal stretches sixels from 10x20 pixel cells to the real
+  // ones, so it gets more (see sharpen in lib/png.mjs).
+  if (renderMode === 'sixel') shot = sharpen(shot, process.env.WT_SESSION ? 0.9 : 0.4);
 
   const compose = geom.frame === 'none' ? composeBare : composePhone;
   const composed = compose({
@@ -1029,8 +1048,10 @@ async function tick(force = false) {
 }
 
 async function paint(force) {
-  if (!page || (paused && !force) || (controlBusy && !force)) return;
+  if (!page || (paused && !force)) return;
+  if (controlBusy && !controlScope.getStore()) return;   // dirty stays set; the request repaints
   const L = layout();
+  const gen = viewGen;
   // The screen rect is only computed when a frame is painted. A static page
   // paints rarely, so carry it over - without it clicks map to nothing.
   if (lastLayout?.screenRect && !dirty) L.screenRect = lastLayout.screenRect;
@@ -1038,11 +1059,15 @@ async function paint(force) {
   try {
     // A page stuck in a tight loop never answers the screenshot; without a
     // timeout the pane would sit on the last good frame looking perfectly live.
-    const shot = await Promise.race([
-      page.screenshot({ type: 'png' }),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('page not responding')), 4000)),
-    ]);
+    // Playwright's own timeout, not a race: a raced screenshot kept running
+    // and every later one queued behind it, so the pane never recovered.
+    const shot = await page.screenshot({ type: 'png', timeout: 4000 }).catch((e) => {
+      throw e?.name === 'TimeoutError' ? new Error('page not responding') : e;
+    });
     lastFrameAt = Date.now();
+    // the layout changed while this screenshot was taken: the tick that
+    // changed it paints instead (dirty is left set, so one always does)
+    if (gen !== viewGen) return;
 
     if (welcomeOn) {
       // the project keeps loading behind the welcome screen, and a snapshot
@@ -1057,7 +1082,9 @@ async function paint(force) {
           dirty = false;
         }
         const WL = welcomeLayout(L);
-        paintImage(WL, await welcomeFrame(WL));
+        const frame = await welcomeFrame(WL);
+        if (gen !== viewGen || !welcomeOn) return;   // resized or dismissed meanwhile
+        paintImage(WL, frame);
         welcomePainted = true;
         lastStatus = null;   // Windows Terminal wipes the footer under a new sixel
       }
@@ -1071,6 +1098,7 @@ async function paint(force) {
     if (renderMode === 'text') {
       // the picture is only kept for snapshots; what we paint is the DOM
       const ex = await page.evaluate(EXTRACT);
+      if (gen !== viewGen) return;
       const key = JSON.stringify(ex.blocks);
       if (key !== lastTextKey || dirty) {
         lastTextKey = key;
@@ -1447,6 +1475,7 @@ function dismissWelcome() {
   welcomeOn = false;
   welcomeImg = null;
   // the welcome screen is wider than a phone frame, so clear it all away
+  viewGen++;
   dirty = true; lastShot = null;
   if (welcomeTab) { welcomeTab.context().close().catch(() => {}); welcomeTab = null; }
 }
@@ -1730,6 +1759,7 @@ const enqueue = (events, dispatch) => {
 
 // ----------------------------------------------------------------- main ----
 async function applyViewport() {
+  viewGen++;              // a frame already in flight is for the old viewport
   // Inside the try too: a resize landing mid-navigation, or after the browser
   // has gone, throws here, and nothing upstream of a resize event catches it.
   try {
@@ -1843,7 +1873,8 @@ async function main() {
   for (const ms of [700, 1500, 3000, 6000]) setTimeout(askSize, ms);
 
   // one loop drives both the repaint and the shared-pane check
-  tickTimer = setInterval(() => { tick(); checkControl(); }, INTERVAL);
+  // control first, so a request claims the page before an ordinary tick does
+  tickTimer = setInterval(() => { checkControl(); tick(); }, INTERVAL);
   clearInterval(startBeat);       // tick keeps the heartbeat from here on
   // Dragging a pane border fires resize dozens of times; only the size it
   // settles on is worth a viewport change. A failure here has nobody above it
@@ -1851,6 +1882,7 @@ async function main() {
   let resizeTimer = null;
   process.stdout.on('resize', () => {
     probedSize = null;              // from here on process.stdout is current
+    viewGen++;
     dirty = true; lastShot = null;
     menuKey = null;                 // an in-flight picker render is the old size
     clearTimeout(resizeTimer);
