@@ -1579,8 +1579,11 @@ async function main() {
 
     if (overlay) { closeOverlay(); return tick(true); }
 
-    // while the device picker is open, letters narrow the list
-    if (menuOpen && menuMode === 'preset' && k !== '\r' && k !== '\n' && k !== ESC && k !== ' ') {
+    // while the device picker is open, letters narrow the list. Space still
+    // closes an untouched picker, but once a filter is started it is part of
+    // the query: device names have spaces in them ("iphone 15").
+    if (menuOpen && menuMode === 'preset' && k !== '\r' && k !== '\n' && k !== ESC && (k !== ' ' || menuFilter)) {
+      if (k === ' ' && menuFilter.endsWith(' ')) return;   // held space: one is enough
       if (k === '\x7f' || k === '\b') menuFilter = menuFilter.slice(0, -1);
       else if (k >= ' ' && k.length === 1) menuFilter += k;
       else return;
