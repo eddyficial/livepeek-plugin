@@ -135,7 +135,6 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
     process.exit(1);
   }
   // scale every frame to the first frame's shape so the canvas is consistent
-  const first = decodePng(readFileSync(pngs[0]));
   // Frames can have different shapes (a desktop page, then a phone). Fit each
   // one inside a common canvas on a dark matte rather than stretching it.
   const decoded = pngs.map((f) => decodePng(readFileSync(f)));

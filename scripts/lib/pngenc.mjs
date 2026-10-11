@@ -26,7 +26,7 @@ function chunk(type, data) {
   return Buffer.concat([len, td, crc]);
 }
 
-/** @param img {width, height, data: Uint8Array RGB} */
+/** @param {{ width: number, height: number, data: Uint8Array }} img */
 export function encodePng(img) {
   const { width: w, height: h, data } = img;
   const raw = Buffer.alloc((w * 3 + 1) * h);

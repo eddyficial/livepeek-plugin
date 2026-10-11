@@ -262,6 +262,7 @@ function wtExe() {
   return 'wt.exe';
 }
 
+/** @type {Record<string, () => [string, string[]]>} */
 const splitters = {
   tmux: () => ['tmux', [
     'split-window',
@@ -279,7 +280,8 @@ const splitters = {
   ]],
 
   kitty: () => ['kitty', [
-    '@', 'launch', '--type=window',
+    '@', ...(process.env.KITTY_LISTEN_ON ? ['--to', process.env.KITTY_LISTEN_ON] : []),
+    'launch', '--type=window',
     `--location=${flag('--horizontal') ? 'hsplit' : 'vsplit'}`,
     '--cwd', paneCwd, ...previewCmd,
   ]],
@@ -477,6 +479,7 @@ async function main() {
   const r = spawnSync(cmd, args, { stdio: 'inherit', cwd: paneCwd });
   if (r.error || (r.status != null && r.status !== 0)) {
     if (weHoldClaim) session.release();
+    if (host === 'kitty') die('Could not split the kitty pane. Enable `allow_remote_control yes` (and optionally `listen_on`) in kitty.conf.');
     die(`Could not split the ${host} pane: ${r.error?.message || 'exit ' + r.status}`);
   }
 

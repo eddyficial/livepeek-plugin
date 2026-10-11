@@ -57,7 +57,7 @@ function portFromScript(cmd) {
 
 /**
  * @param {object} pkg  parsed package.json
- * @returns {{id, port, script, preset, needs?, install?, missing: string[]}|null}
+ * @returns {{id, port, script, preset, kind: string, needs?, install?, missing: string[]}|null}
  */
 export function detectFramework(pkg) {
   const deps = { ...pkg.dependencies, ...pkg.devDependencies };

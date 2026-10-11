@@ -70,5 +70,6 @@ export function kittyClearAll() {
  * user's config. Inner ESCs have to be doubled.
  */
 export function tmuxWrap(seq) {
+  // eslint-disable-next-line no-control-regex -- tmux escaping doubles ESC.
   return `${ESC}Ptmux;${seq.replace(/\x1b/g, '\x1b\x1b')}${ESC}\\`;
 }

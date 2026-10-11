@@ -23,16 +23,16 @@ import net from 'node:net';
 import path from 'node:path';
 import os from 'node:os';
 import vm from 'node:vm';
+import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
-import { createRequire } from 'node:module';
-import { spawn } from 'node:child_process';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { decodePng, resize, sharpen } from './lib/png.mjs';
 import { toSixel, toHalfBlocks } from './lib/sixel.mjs';
 import { toKitty, tmuxWrap, kittyClearAll } from './lib/kitty.mjs';
 import { probeTerminal, pickRenderer } from './lib/caps.mjs';
 import * as session from './lib/session.mjs';
-import { serveStatic } from './lib/serve.mjs';
+import { gateLanRequest, serveStatic } from './lib/serve.mjs';
+import { startManagedDevServer, stopManagedDevServer } from './lib/devserver.mjs';
 import * as projects from './lib/projects.mjs';
 import * as intro from './lib/intro.mjs';
 import { menuHtml, iconOf, HEAD_ROWS, ROW_H, FOOT_ROWS } from './lib/menuview.mjs';
@@ -236,7 +236,6 @@ let lastShot = null;
 let pendingWipe = null;   // { from, to }: rows an overlay left text in under the image
 let statusMsg = 'starting';
 let errors = [];           // console errors and uncaught exceptions on the page
-let lastFrameAt = 0;       // when the browser last answered a screenshot
 let colorScheme = null;    // null = page default, 'dark' | 'light' when forced
 let zoom = 1;
 let textLines = [];        // text renderer: laid-out lines of the current page
@@ -269,6 +268,10 @@ let pageHref = '';        // the page's own address, which moves as the user nav
 let noticeUntil = 0;      // a footer notice holds until then before 'live' replaces it,
 let noticeMsg = '';       // unless something else has taken the footer since
 let lanServer = null;     // livepeek's own server answering on the LAN too (m, then s)
+let lanToken = null;
+let devServer = null;
+let devServerKey = null;
+let devServerPort = null;
 
 /** A footer message that outlasts the next few frames instead of one. */
 function notice(msg, ms = 3000) {
@@ -284,6 +287,7 @@ function notice(msg, ms = 3000) {
  * working across several things at once; the view should follow you rather
  * than make you start over.
  */
+/** @type {Array<[number, string, string]>} */
 const KNOWN_PORTS = [
   [8081, 'Expo / Metro',      'iphone-15-pro'],
   [3000, 'Next / CRA / Nuxt', 'desktop'],
@@ -350,29 +354,48 @@ async function ensureServer() {
 let staticServer = null;
 async function serveFolder(opts) {
   const r = await serveStatic(opts);
+  stopDevServer();
   try { staticServer?.close(); } catch { /* already closed */ }
   try { lanServer?.close(); } catch { /* already closed */ }
+  try { lanServer?.closeAllConnections?.(); } catch { /* already closed */ }
   staticServer = r.server;
   lanServer = null;
+  lanToken = null;
   return r;
 }
 
 /** Run `npm run <script>` in cwd and wait for its port. Resolves true when up. */
 async function startDevServer(script, cwd, port) {
+  const key = `${path.resolve(cwd)}\0${script}\0${port}`;
+  if (devServer && devServerKey === key && devServer.exitCode === null && await portOpen(port)) return true;
   statusMsg = 'starting dev server';
   drawFooter(lastLayout || layout());
-
-  spawn('npm', ['run', script], {
-    cwd, stdio: 'ignore', shell: true, windowsHide: true,
-  }).unref();
-
-  const deadline = Date.now() + 90_000;
-  while (Date.now() < deadline) {
-    await new Promise(r => setTimeout(r, 400));
-    if (await portOpen(port)) return true;
+  const stoppedPort = stopDevServer();
+  if (stoppedPort === port) {
+    const deadline = Date.now() + 2000;
+    while (Date.now() < deadline && await portOpen(port)) {
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
   }
-  statusMsg = `!dev server never came up on :${port}`;
-  return false;
+  if (await portOpen(port)) return true;
+  const r = await startManagedDevServer({
+    script, cwd, port, portOpen,
+    maxStatusLength: Math.max(40, (lastLayout || layout()).cols - 2),
+  });
+  devServer = r.child;
+  devServerKey = r.child ? key : null;
+  devServerPort = r.child ? port : null;
+  if (!r.ok) statusMsg = r.message;
+  return r.ok;
+}
+
+function stopDevServer() {
+  const port = devServerPort;
+  stopManagedDevServer(devServer);
+  devServer = null;
+  devServerKey = null;
+  devServerPort = null;
+  return port;
 }
 
 // ------------------------------------------------------ shared pane state ----
@@ -519,7 +542,7 @@ async function applyControl(s) {
     publish({ static: null, file: null });
   }
 
-  if (s.serve && s.serve.port && !(await portOpen(s.serve.port))) {
+  if (s.serve && s.serve.port) {
     await startDevServer(s.serve.script, s.serve.cwd, s.serve.port);
   }
   if (s.serve) publish({ serve: null });
@@ -566,7 +589,8 @@ async function scanTargets() {
   await Promise.all(KNOWN_PORTS.map(async ([port, label, preset]) => {
     const url = `http://localhost:${port}`;
     if (seen.has(url) || !(await portOpen(port))) return;
-    found.push({ label: `localhost:${port}`, sub: label, url, port, preset, running: true, static: false });
+    found.push({ label: `localhost:${port}`, sub: label, url, dir: null, file: null,
+      script: null, port, preset, running: true, static: false });
   }));
   return found;
 }
@@ -766,6 +790,7 @@ function drawFooter(L) {
   let chosen = [];
   for (const i of order) {
     const next = [...chosen, i].sort((x, y) => x - y);
+    // eslint-disable-next-line no-control-regex -- strips terminal color escapes.
     const visible = (s) => s.replace(/\x1b\[[0-9;]*m/g, '');
     if (visible(next.map(j => items[j]).join(sep)).length > budget) break;
     chosen = next;
@@ -984,10 +1009,10 @@ async function menuSelect(pos) {
       }
     } else {
       shownDir = null;
-      if (!t.running && t.script && t.port) {
+      if (t.script && t.port) {
         const ok = await startDevServer(t.script, t.dir, t.port);
         if (!ok) return tick(true);
-      }
+      } else if (t.url !== currentTarget) stopDevServer();
       currentTarget = t.url;
     }
     publish();
@@ -1172,7 +1197,6 @@ async function paint(force) {
     const shot = await page.screenshot({ type: 'png', timeout: 4000 }).catch((e) => {
       throw e?.name === 'TimeoutError' ? new Error('page not responding') : e;
     });
-    lastFrameAt = Date.now();
     // the layout changed while this screenshot was taken: the tick that
     // changed it paints instead (dirty is left set, so one always does)
     if (gen !== viewGen) return;
@@ -1360,8 +1384,11 @@ async function handleMouse(code, col, row, press) {
         const el = document.querySelector('[data-livepeek-id="' + id + '"]');
         if (!el) return;
         el.scrollIntoView({ block: 'center' });
-        if (el.matches('input,textarea,select')) { el.focus(); if (el.type === 'checkbox' || el.type === 'radio') el.click(); }
-        else el.click();
+        const htmlEl = /** @type {HTMLElement} */ (el);
+        if (el.matches('input,textarea,select')) {
+          const input = /** @type {HTMLInputElement} */ (el);
+          htmlEl.focus(); if (input.type === 'checkbox' || input.type === 'radio') htmlEl.click();
+        } else htmlEl.click();
       }, hit.id);
     } catch { /* mid-navigation */ }
     lastTextKey = '';
@@ -1633,12 +1660,16 @@ async function showPhoneCode() {
   if (!lan) {
     return openOverlay('open on your phone', [['', 'this computer is not on a network a phone can reach;'], ['', 'join Wi-Fi or Ethernet, then press m again']]);
   }
-  const url = phoneUrl(href, lan.address);
+  let url = phoneUrl(href, lan.address);
   const u = new URL(url);
   const port = Number(u.port || (u.protocol === 'https:' ? 443 : 80));
+  const ours = staticServer && port === staticServer.address()?.port
+    && ['localhost', '127.0.0.1'].includes(new URL(href).hostname);
+  if (ours && lanServer && lanToken) {
+    u.searchParams.set('t', lanToken);
+    url = u.href;
+  }
   if (!(await reachable(u.hostname, port))) {
-    const ours = staticServer && port === staticServer.address()?.port
-      && ['localhost', '127.0.0.1'].includes(new URL(href).hostname);
     if (ours) {
       return openOverlay('open on your phone', [
         ['', "livepeek's server only answers this computer."],
@@ -1673,17 +1704,20 @@ async function shareOnLan() {
   const port = staticServer?.address()?.port;
   if (!port || !lan) return tick(true);
   try { lanServer?.close(); } catch { /* already closed */ }
+  try { lanServer?.closeAllConnections?.(); } catch { /* already closed */ }
   const http = await import('node:http');
   // Bound to the server shared now: after a folder switch it must not start
   // answering for the new folder. Claimed before listen() resolves, so a
   // switch meanwhile (serveFolder) closes it too.
   const shared = staticServer;
-  const srv = http.createServer((req, res) => shared.emit('request', req, res));
+  const token = crypto.randomBytes(18).toString('base64url');
+  const srv = http.createServer(gateLanRequest(token, (req, res) => shared.emit('request', req, res)));
   lanServer = srv;
+  lanToken = token;
   try {
-    await new Promise((resolve, reject) => { srv.once('error', reject); srv.listen(port, lan.address, resolve); });
+    await new Promise((resolve, reject) => { srv.once('error', reject); srv.listen(port, lan.address, () => resolve()); });
   } catch {
-    if (lanServer === srv) lanServer = null;
+    if (lanServer === srv) { lanServer = null; lanToken = null; }
     notice('!could not share on ' + lan.address);
     return tick(true);
   }
@@ -1897,7 +1931,9 @@ const CSI_TILDE = {
   19: 'F8', 20: 'F9', 21: 'F10', 23: 'F11', 24: 'F12',
 };
 
+// eslint-disable-next-line no-control-regex -- keyboard input starts with ESC.
 const CSI_RE = /^\x1b\[([0-9;:]*)([@-~])/;
+// eslint-disable-next-line no-control-regex -- keyboard input starts with ESC.
 const SS3_RE = /^\x1bO([A-Za-z])/;
 
 /**
@@ -1966,7 +2002,8 @@ async function editableFocused() {
     return await page.evaluate(() => {
       const el = document.activeElement;
       if (!el) return false;
-      return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable === true;
+      return el.tagName === 'INPUT' || el.tagName === 'TEXTAREA'
+        || (el instanceof HTMLElement && el.isContentEditable === true);
     });
   } catch { return true; }      // on doubt, behave like a text field
 }
@@ -2018,6 +2055,7 @@ function parseInput(chunk) {
 
   while (inbuf.length) {
     if (inbuf.startsWith(`${ESC}[<`)) {
+      // eslint-disable-next-line no-control-regex -- mouse input starts with ESC.
       const m = /^\x1b\[<(\d+);(\d+);(\d+)([Mm])/.exec(inbuf);
       if (!m) {
         if (inbuf.length < 24) break;       // incomplete, wait for more
@@ -2037,6 +2075,7 @@ function parseInput(chunk) {
     }
 
     // cursor position report, the answer to askSize(): ESC [ rows ; cols R
+    // eslint-disable-next-line no-control-regex -- terminal replies contain ESC.
     const cpr = /^\x1b\[(\d+);(\d+)R/.exec(inbuf);
     if (cpr) {
       events.push({ t: 'size', rows: parseInt(cpr[1], 10), cols: parseInt(cpr[2], 10) });
@@ -2243,6 +2282,7 @@ async function main() {
       }
       if (c === '\x7f' || c === '\b') prompt.text = prompt.text.slice(0, -1);
       else {
+        // eslint-disable-next-line no-control-regex -- pasted controls are discarded.
         const clean = c.replace(/[\x00-\x1f\x7f]/g, '');
         if (!clean) return;
         prompt.text = (prompt.text + clean).slice(0, 500);
@@ -2354,7 +2394,7 @@ async function main() {
       }
       openMenu('target');
     }
-    else if (k === 'r') { lastShot = null; dirty = true; try { await page.reload({ waitUntil: 'domcontentloaded' }); } catch {} }
+    else if (k === 'r') { lastShot = null; dirty = true; try { await page.reload({ waitUntil: 'domcontentloaded' }); } catch { /* try next frame */ } }
     else if (k === '.') { paused = !paused; drawFooter(lastLayout || layout()); }
     else if (k === 'b') { cycleRenderer(); }
     else if (k === 'e') {
@@ -2365,7 +2405,7 @@ async function main() {
     }
     else if (k === 'd') {
       colorScheme = colorScheme === 'dark' ? 'light' : 'dark';
-      try { await page.emulateMedia({ colorScheme }); } catch {}
+      try { await page.emulateMedia({ colorScheme }); } catch { /* try next toggle */ }
       statusMsg = colorScheme; lastShot = null; await tick(true);
     }
     else if (k === '+' || k === '=' || k === '-' || k === '0') {
@@ -2435,16 +2475,30 @@ function restore() {
   try { if (process.stdin.isTTY) process.stdin.setRawMode(false); } catch { /* stdin already gone */ }
 }
 
-function shutdown() {
+let shuttingDown = false;
+async function shutdown(code = 0, error = null) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  restore();
   if (tickTimer) clearInterval(tickTimer);
   releaseSession();             // stop advertising a pane that is going away
-  restore();
-  browser?.close().catch(() => {});
-  process.exit(0);
+  stopDevServer();
+  try { lanServer?.close(); } catch { /* already closed */ }
+  try { lanServer?.closeAllConnections?.(); } catch { /* already closed */ }
+  try { staticServer?.close(); } catch { /* already closed */ }
+  if (error) console.error(error);
+  try {
+    await Promise.race([
+      browser?.close() || Promise.resolve(),
+      new Promise(resolve => setTimeout(resolve, 2000)),
+    ]);
+  } catch { /* exiting anyway */ }
+  process.exit(code);
 }
 
 process.on('SIGINT', () => shutdown());
 process.on('SIGTERM', () => shutdown());
+process.on('SIGHUP', () => shutdown());
 
 // A last resort for anything that slips past the handlers above - an event
 // callback that throws, a promise nobody awaited. Without it the process dies
@@ -2452,20 +2506,26 @@ process.on('SIGTERM', () => shutdown());
 // reporting on: the user's shell is left unusable, and the headless browser
 // is orphaned.
 const crash = (e) => {
-  restore();
-  try { releaseSession(); } catch { /* exiting anyway */ }
-  try { browser?.close().catch(() => {}); } catch { /* exiting anyway */ }
-  console.error(e);
-  process.exit(1);
+  shutdown(1, e);
 };
 process.on('uncaughtException', crash);
 process.on('unhandledRejection', crash);
 
-main().catch((e) => {
+main().catch(async (e) => {
   clearInterval(startBeat);
-  out(`${ESC}[?1003l${ESC}[?1006l${ESC}[?1002l${ESC}[?1000l${ESC}[?25h${ESC}[?1049l`);
+  restore();
   releaseSession();
+  stopDevServer();
+  try { lanServer?.close(); } catch { /* already closed */ }
+  try { lanServer?.closeAllConnections?.(); } catch { /* already closed */ }
+  try { staticServer?.close(); } catch { /* already closed */ }
   console.error('\nlivepeek could not start:\n\n' + (e.message || e) + '\n');
+  try {
+    await Promise.race([
+      browser?.close() || Promise.resolve(),
+      new Promise(resolve => setTimeout(resolve, 2000)),
+    ]);
+  } catch { /* exiting anyway */ }
   // Exit 0 after a keypress rather than 1 immediately. A non-zero exit makes
   // the terminal keep this pane open as a corpse; a zero exit on a key gives
   // the user time to read the error and then takes the pane away cleanly.

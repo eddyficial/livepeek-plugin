@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 import { EXTRACT, layoutText } from '../../scripts/lib/textview.mjs';
 
 const require = createRequire(import.meta.url);
+// @ts-expect-error -- CI installs this optional browser driver before tests.
 const { chromium } = require('../../scripts/node_modules/playwright-core');
 
 const target = process.argv[2];
@@ -22,6 +23,7 @@ const ex = await p.evaluate(EXTRACT);
 const lines = layoutText(ex.blocks, width);
 console.log(`${ex.title}: ${lines.length} lines`);
 for (const l of lines) {
+  // eslint-disable-next-line no-control-regex -- strips terminal color escapes.
   const plain = l.text.replace(/\x1b\[[0-9;]*m/g, '');
   const spans = l.spans.length ? '   <' + l.spans.map(s => s.role + '#' + s.id).join(',') + '>' : '';
   console.log('|' + plain + spans);

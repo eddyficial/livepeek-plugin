@@ -20,6 +20,7 @@
  *
  * To add an entry, append it. No other file needs to change.
  */
+// @ts-ignore -- this browser script deliberately publishes the VM input.
 window.PRESETS = [
   // ---- iPhone ----------------------------------------------------------
   { id: 'iphone-17-pro-max', name: 'Apple iPhone 17 Pro Max', brand: 'Apple', os: 'iOS',     w: 440, h: 956, dpr: 3, r: 55, cut: 'island' },
