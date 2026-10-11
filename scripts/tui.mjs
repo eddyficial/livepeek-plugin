@@ -327,9 +327,8 @@ function portOpen(port) {
 /**
  * Start the project's dev server if nothing is on its port yet.
  *
- * Not detached: on Windows that would force a new console window, and here it
- * is unnecessary anyway - this process belongs to the terminal, so an unref'd
- * child survives on its own.
+ * lib/devserver.mjs owns the child: it is stopped on quit, on a project switch
+ * and when the terminal closes, so it never outlives the pane.
  */
 async function ensureServer() {
   if (STATIC_DIR) {
