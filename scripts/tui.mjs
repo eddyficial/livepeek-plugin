@@ -123,8 +123,8 @@ let landscape = false;
  * is shrunk to the pane, which is what makes a 1440px page look hazy.
  */
 function fitSize() {
-  const cols = process.stdout.columns || 80;
-  const rows = process.stdout.rows || 24;
+  const cols = probedSize?.cols || process.stdout.columns || 80;
+  const rows = probedSize?.rows || process.stdout.rows || 24;
   const margin = 3;
   return {
     w: Math.max(320, Math.floor(Math.max(4, cols - 2) * cw) - margin * 2),
@@ -247,6 +247,8 @@ let dirty = true;
 // layout; painting it after the new one's clear leaves the old, wider picture
 // showing around the new one. paint() drops a frame whose generation is stale.
 let viewGen = 0;
+let lastRefit = 0;        // when paint() last re-applied a viewport Chrome dropped
+const SHOT_SCALE = 2;     // device pixels per CSS pixel the page is captured at
 let lastLayout = null;
 
 // When typing, every keystroke goes to the page instead of the viewer - which
@@ -583,6 +585,7 @@ async function applySize(rows, cols) {
   menuKey = null;                   // an in-flight picker render is the old size
   viewGen++;
   dirty = true; lastShot = null; lastTextKey = '';
+  if (devices[deviceIdx]?.fit) return applyViewport();   // the page is sized from the pane
   await tick(true);
 }
 function layout() {
@@ -1068,6 +1071,18 @@ async function paint(force) {
     // the layout changed while this screenshot was taken: the tick that
     // changed it paints instead (dirty is left set, so one always does)
     if (gen !== viewGen) return;
+
+    // Chrome now and then drops a viewport change (one that lands while the
+    // page reloads, say): the page stays laid out for the old size while the
+    // header names the new device. The frame's own size gives that away.
+    const want = vp();
+    if (shot.readUInt32BE(16) !== want.width * SHOT_SCALE || shot.readUInt32BE(20) !== want.height * SHOT_SCALE) {
+      if (Date.now() - lastRefit > 1000) {
+        lastRefit = Date.now();
+        await applyViewport();      // awaited: a snapshot must not get this frame
+        return;
+      }
+    }
 
     if (welcomeOn) {
       // the project keeps loading behind the welcome screen, and a snapshot
@@ -1770,7 +1785,7 @@ async function applyViewport() {
     const got = await page.evaluate(() => [innerWidth, innerHeight]);
     if (got[0] !== want.width || got[1] !== want.height) {
       await new Promise(r => setTimeout(r, 150));
-      await page.setViewportSize(want);
+      await page.setViewportSize(vp());   // not want: the device may have changed meanwhile
     }
   } catch { /* mid-navigation */ }
   lastShot = null;
@@ -1811,7 +1826,7 @@ async function main() {
   browser = await launchBrowser(chromium);
   // 2x then downsampled in render(): text and edges come out anti-aliased
   // instead of jagged. Snapshots are written at this 2x size too.
-  const ctx = await browser.newContext({ viewport: vp(), deviceScaleFactor: 2 });
+  const ctx = await browser.newContext({ viewport: vp(), deviceScaleFactor: SHOT_SCALE });
   page = await ctx.newPage();
   if (renderMode === 'sixel' || renderMode === 'kitty') warmMenuTab().catch(() => { menuTabP = null; });
 
