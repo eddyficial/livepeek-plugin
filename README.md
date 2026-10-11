@@ -223,11 +223,13 @@ the only pane left, so close it with `q`.
 
 ## Keys
 
-Focus the pane first: `alt`+arrow in most terminals, `prefix`+arrow in tmux.
+Focus the pane first: `alt`+arrow in most terminals, `prefix`+arrow in tmux,
+or click the picture. If letters you press turn up in Claude's input box
+instead, the focus is still on the other pane.
 
 | key | does |
 |---|---|
-| click / scroll | goes through to the page |
+| click / drag / scroll / hover | goes through to the page |
 | `i` | **typing mode**: send keystrokes to the page |
 | `space` | **pick a device**; start typing to filter: `iph`, `sam`, `pixel`, `desk` |
 | `p` | **switch project**: every folder you have previewed before, plus any dev server running |
@@ -247,21 +249,78 @@ Focus the pane first: `alt`+arrow in most terminals, `prefix`+arrow in tmux.
 | `b` | cycle renderer: kitty, sixel, text, half-blocks |
 | `q` | quit and close the pane |
 
-In the preset picker: `↑`/`↓` move, `PageUp`/`PageDown` jump, `Home`/`End` go
-to the ends, `enter` selects, `esc` closes. The mouse wheel scrolls the list and
-a click picks. With kitty or sixel graphics the picker is drawn as a panel with
-a search field and a small outline of each device; in text or half-block mode,
-or a very short pane, it is a plain list.
-
-In picture modes, the first few launches show a welcome card pointing at the device name in the
-header; clicking the name opens the picker. The card stops appearing once you
-have used the picker, or after three launches.
-
 Anything with alt or ctrl held is left alone, so your terminal's own bindings
 still work; alt+arrow moves between panes rather than reaching the viewer.
 
 Quit with `q` rather than killing it; that shuts the headless browser down
 cleanly instead of orphaning it.
+
+### Picking a device
+
+`space` opens the device picker: every screen livepeek can show, from phones
+and tablets to laptop and desktop sizes and game shapes. The current one is
+ticked.
+
+**Type to narrow it down.** Each letter filters the list, and the search line
+shows what you have typed:
+
+| type | leaves |
+|---|---|
+| `iph` | iPhones |
+| `sam` | Samsung Galaxy phones |
+| `pixel` | Google Pixels |
+| `ipad` | iPads |
+| `desk` | desktop sizes |
+| `game` | game aspect ratios |
+
+The filter matches anywhere in the brand, the model, the OS and the preset id,
+so `ios` finds every Apple device, `android` every Android one, and `ultra`
+the S24 Ultra. Once you have started typing, a space is part of the search
+(`iphone 15`); on an empty filter, `space` closes the picker again.
+`backspace` takes the last letter off; if nothing matches, the picker says so.
+
+Then `↑`/`↓` move, `PageUp`/`PageDown` jump, `Home`/`End` go to the ends,
+`enter` selects, `esc` closes without changing anything. The mouse wheel
+scrolls the list and a click picks. The page resizes to the new device at once.
+
+The right-hand column is each device's viewport in CSS pixels (`384x824`).
+**Fit to pane** says `pane size`: it fills whatever space the pane has and
+follows it when you resize the pane.
+
+With kitty or sixel graphics the picker is drawn as a panel with a search
+field and a small outline of each device; in text or half-block mode, or a
+very short pane, it is a plain list.
+
+Without opening it, `[` and `]` step to the previous or next device in the
+list, and `o` turns the current one between portrait and landscape.
+
+### Point, go to, open elsewhere
+
+- **`x`, point at something.** Hovering outlines the element under the pointer
+  in pink, with its tag; a click picks it. Claude reads the pick with
+  `livepeek --picked` (text, selector, and the React or Vue component that
+  drew it), and a one-line reference is copied to your clipboard to paste
+  into the chat. `esc`, or any other key, stops pointing.
+- **`g`, go to a page.** A line opens in the footer, filled in with the
+  current path. Type `/settings`, `localhost:3000` or a full address and press
+  `enter`; `esc` cancels. Another server becomes the pane's target, as if you
+  had picked it with `p`.
+- **`w`, open in your browser.** Opens the page in your normal browser at full
+  size. Clicking the address in the header does the same.
+- **`m`, open on your phone.** Shows a QR code for the page at your machine's
+  network address; scan it with the phone camera on the same Wi-Fi. A dev
+  server has to listen on the network for that to work:
+  `npm run dev -- --host` for Vite and Astro, `npm run dev -- -H 0.0.0.0` for Next.js; the QR
+  screen says which when it can't reach yours. For a folder or file
+  livepeek serves itself, press `s` on the QR screen to share it on the
+  network. If the phone still can't load it, allow Node.js through your
+  firewall. Dot-files (`.env`, `.git`) are never served.
+
+### The welcome card
+
+In picture modes, the first few launches show a welcome card pointing at the device name in the
+header; clicking the name opens the picker. The card stops appearing once you
+have used the picker, or after three launches.
 
 ### Typing
 
