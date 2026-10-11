@@ -22,34 +22,34 @@
  */
 window.PRESETS = [
   // ---- iPhone ----------------------------------------------------------
-  { id: 'iphone-17-pro-max', name: 'iPhone 17 Pro Max', brand: 'iPhone', os: 'iOS',     w: 440, h: 956, dpr: 3, r: 55, cut: 'island' },
-  { id: 'iphone-17-pro',     name: 'iPhone 17 Pro',     brand: 'iPhone', os: 'iOS',     w: 402, h: 874, dpr: 3, r: 55, cut: 'island' },
-  { id: 'iphone-17',         name: 'iPhone 17',         brand: 'iPhone', os: 'iOS',     w: 402, h: 874, dpr: 3, r: 55, cut: 'island' },
-  { id: 'iphone-16-pro-max', name: 'iPhone 16 Pro Max', brand: 'iPhone', os: 'iOS',     w: 440, h: 956, dpr: 3, r: 55, cut: 'island' },
-  { id: 'iphone-15-pro',     name: 'iPhone 15 Pro',     brand: 'iPhone', os: 'iOS',     w: 393, h: 852, dpr: 3, r: 50, cut: 'island' },
-  { id: 'iphone-15-pro-max', name: 'iPhone 15 Pro Max', brand: 'iPhone', os: 'iOS',     w: 430, h: 932, dpr: 3, r: 53, cut: 'island' },
-  { id: 'iphone-14',         name: 'iPhone 13 / 14',    brand: 'iPhone', os: 'iOS',     w: 390, h: 844, dpr: 3, r: 47, cut: 'notch' },
-  { id: 'iphone-13-mini',    name: 'iPhone 13 mini',    brand: 'iPhone', os: 'iOS',     w: 375, h: 812, dpr: 3, r: 44, cut: 'notch' },
-  { id: 'iphone-se',         name: 'iPhone SE (3rd gen)', brand: 'iPhone', os: 'iOS',   w: 375, h: 667, dpr: 2, r: 4,  cut: 'none', chin: true },
+  { id: 'iphone-17-pro-max', name: 'Apple iPhone 17 Pro Max', brand: 'Apple', os: 'iOS',     w: 440, h: 956, dpr: 3, r: 55, cut: 'island' },
+  { id: 'iphone-17-pro',     name: 'Apple iPhone 17 Pro',     brand: 'Apple', os: 'iOS',     w: 402, h: 874, dpr: 3, r: 55, cut: 'island' },
+  { id: 'iphone-17',         name: 'Apple iPhone 17',         brand: 'Apple', os: 'iOS',     w: 402, h: 874, dpr: 3, r: 55, cut: 'island' },
+  { id: 'iphone-16-pro-max', name: 'Apple iPhone 16 Pro Max', brand: 'Apple', os: 'iOS',     w: 440, h: 956, dpr: 3, r: 55, cut: 'island' },
+  { id: 'iphone-15-pro',     name: 'Apple iPhone 15 Pro',     brand: 'Apple', os: 'iOS',     w: 393, h: 852, dpr: 3, r: 50, cut: 'island' },
+  { id: 'iphone-15-pro-max', name: 'Apple iPhone 15 Pro Max', brand: 'Apple', os: 'iOS',     w: 430, h: 932, dpr: 3, r: 53, cut: 'island' },
+  { id: 'iphone-14',         name: 'Apple iPhone 13 / 14',    brand: 'Apple', os: 'iOS',     w: 390, h: 844, dpr: 3, r: 47, cut: 'notch' },
+  { id: 'iphone-13-mini',    name: 'Apple iPhone 13 mini',    brand: 'Apple', os: 'iOS',     w: 375, h: 812, dpr: 3, r: 44, cut: 'notch' },
+  { id: 'iphone-se',         name: 'Apple iPhone SE (3rd gen)', brand: 'Apple', os: 'iOS',   w: 375, h: 667, dpr: 2, r: 4,  cut: 'none', chin: true },
 
   // ---- Pixel -----------------------------------------------------------
-  { id: 'pixel-9-pro-xl',    name: 'Pixel 9 Pro XL',    brand: 'Pixel',  os: 'Android', w: 448, h: 998, dpr: 2.625, r: 42, cut: 'hole' },
-  { id: 'pixel-9-pro',       name: 'Pixel 9 Pro',       brand: 'Pixel',  os: 'Android', w: 428, h: 952, dpr: 2.625, r: 42, cut: 'hole' },
-  { id: 'pixel-9',           name: 'Pixel 8 / 9',       brand: 'Pixel',  os: 'Android', w: 412, h: 915, dpr: 2.625, r: 38, cut: 'hole' },
-  { id: 'pixel-7a',          name: 'Pixel 7a',          brand: 'Pixel',  os: 'Android', w: 412, h: 892, dpr: 2.625, r: 32, cut: 'hole' },
+  { id: 'pixel-9-pro-xl',    name: 'Google Pixel 9 Pro XL',    brand: 'Google',  os: 'Android', w: 448, h: 998, dpr: 2.625, r: 42, cut: 'hole' },
+  { id: 'pixel-9-pro',       name: 'Google Pixel 9 Pro',       brand: 'Google',  os: 'Android', w: 428, h: 952, dpr: 2.625, r: 42, cut: 'hole' },
+  { id: 'pixel-9',           name: 'Google Pixel 8 / 9',       brand: 'Google',  os: 'Android', w: 412, h: 915, dpr: 2.625, r: 38, cut: 'hole' },
+  { id: 'pixel-7a',          name: 'Google Pixel 7a',          brand: 'Google',  os: 'Android', w: 412, h: 892, dpr: 2.625, r: 32, cut: 'hole' },
 
-  // ---- Galaxy ----------------------------------------------------------
-  { id: 'galaxy-s24-ultra',  name: 'Galaxy S24 Ultra',  brand: 'Galaxy', os: 'Android', w: 384, h: 824, dpr: 3.75, r: 26, cut: 'hole' },
-  { id: 'galaxy-s24',        name: 'Galaxy S23 / S24',  brand: 'Galaxy', os: 'Android', w: 360, h: 780, dpr: 3,    r: 36, cut: 'hole' },
-  { id: 'galaxy-a54',        name: 'Galaxy A54',        brand: 'Galaxy', os: 'Android', w: 360, h: 800, dpr: 3,    r: 28, cut: 'hole' },
-  { id: 'galaxy-fold-open',  name: 'Galaxy Z Fold (open)', brand: 'Galaxy', os: 'Android', w: 673, h: 841, dpr: 2.625, r: 24, cut: 'hole' },
+  // ---- Samsung ---------------------------------------------------------
+  { id: 'galaxy-s24-ultra',  name: 'Samsung Galaxy S24 Ultra',  brand: 'Samsung', os: 'Android', w: 384, h: 824, dpr: 3.75, r: 26, cut: 'hole' },
+  { id: 'galaxy-s24',        name: 'Samsung Galaxy S23 / S24',  brand: 'Samsung', os: 'Android', w: 360, h: 780, dpr: 3,    r: 36, cut: 'hole' },
+  { id: 'galaxy-a54',        name: 'Samsung Galaxy A54',        brand: 'Samsung', os: 'Android', w: 360, h: 800, dpr: 3,    r: 28, cut: 'hole' },
+  { id: 'galaxy-fold-open',  name: 'Samsung Galaxy Z Fold (open)', brand: 'Samsung', os: 'Android', w: 673, h: 841, dpr: 2.625, r: 24, cut: 'hole' },
 
   // ---- Small / legacy --------------------------------------------------
   { id: 'android-small',     name: 'Small Android (360×640)', brand: 'Other', os: 'Android', w: 360, h: 640, dpr: 2, r: 20, cut: 'none' },
 
   // ---- Tablets ---------------------------------------------------------
-  { id: 'ipad-mini',         name: 'iPad mini',         brand: 'Tablet', os: 'iPadOS',  w: 744, h: 1133, dpr: 2, r: 32, cut: 'none' },
-  { id: 'ipad-pro-11',       name: 'iPad Pro 11"',      brand: 'Tablet', os: 'iPadOS',  w: 834, h: 1194, dpr: 2, r: 32, cut: 'none' },
+  { id: 'ipad-mini',         name: 'Apple iPad mini',         brand: 'Tablet', os: 'iPadOS',  w: 744, h: 1133, dpr: 2, r: 32, cut: 'none' },
+  { id: 'ipad-pro-11',       name: 'Apple iPad Pro 11"',      brand: 'Tablet', os: 'iPadOS',  w: 834, h: 1194, dpr: 2, r: 32, cut: 'none' },
 
   // ---- Web -------------------------------------------------------------
   // 'fit' renders at the pane's own pixel size, so nothing is scaled down and

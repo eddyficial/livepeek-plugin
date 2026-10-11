@@ -533,6 +533,7 @@ function shortDir(dir) {
 let menuMode = 'preset';          // 'preset' | 'target'
 let menuOpen = false;
 let menuHover = -1;
+let menuFirst = -1;      // first entry in view; -1 centres the selection on the next draw
 let menuBox = null;      // {top,left,width,height,first,count, rowH,rows,image}
 let headerHit = null;    // {row,col0,col1}
 
@@ -716,10 +717,7 @@ function drawMenuText(L) {
   // the bottom scrolls the list instead of walking off it.
   const active = items.findIndex(it => it.active);
   const anchor = menuHover >= 0 ? menuHover : Math.max(0, active);
-  let first = 0;
-  if (items.length > count) {
-    first = Math.min(Math.max(0, anchor - (count >> 1)), items.length - count);
-  }
+  const first = menuWindow(items.length, count, anchor);
 
   const left = 2;
   const top = 3;                       // row 2 is the title / filter line
@@ -752,6 +750,7 @@ let menuTabP = null;
 let menuWant = null;          // newest picker state waiting for a render
 let menuKey = null;           // the state that should be on screen now
 let menuRendering = false;
+let menuShownKey = null;      // the state of the picture actually on screen
 const menuCache = new Map();  // state -> encoded image sequence
 
 /** Entries that fit: the panel ends where the page image does, clear of the footer. */
@@ -768,8 +767,7 @@ function drawMenuImage(L) {
   const count = Math.min(items.length, slots);
   const active = items.findIndex(it => it.active);
   const anchor = menuHover >= 0 ? menuHover : Math.max(0, active);
-  let first = 0;
-  if (items.length > count) first = Math.min(Math.max(0, anchor - (count >> 1)), items.length - count);
+  const first = menuWindow(items.length, count, anchor);
 
   const maxName = Math.max(10, ...all.map(x => (x.label || x.name || '').length));
   const width = Math.min(L.cols - 2, Math.max(36, Math.min(60, Math.ceil(maxName * 0.8) + 24)));
@@ -795,12 +793,13 @@ function drawMenuImage(L) {
   const key = JSON.stringify([view, size, renderMode]);
   menuKey = key;
   const seq = menuCache.get(key);
-  if (seq) { menuWant = null; paintMenu(seq); return; }
+  if (seq) { menuWant = null; paintMenu(seq, key); return; }
   menuWant = { key, view, size, mode: renderMode };
   if (!menuRendering) renderMenuImages();
 }
 
-function paintMenu(seq) {
+function paintMenu(seq, key) {
+  menuShownKey = key;
   out(`${ESC}[2;2H`);
   out(caps.tmux ? tmuxWrap(seq) : seq);
 }
@@ -825,7 +824,7 @@ async function renderMenuImages() {
       if (menuCache.size > 80) menuCache.clear();
       menuCache.set(key, seq);
       // only if nothing newer was drawn or queued meanwhile, and still open
-      if (key === menuKey && menuOpen && menuBox?.image) paintMenu(seq);
+      if (key === menuKey && menuOpen && menuBox?.image) paintMenu(seq, key);
     }
   } catch {
     // leave the picker as it is; the next draw tries again with a fresh tab
@@ -833,6 +832,19 @@ async function renderMenuImages() {
   } finally {
     menuRendering = false;
   }
+}
+
+/**
+ * Which entry the list starts at. The window stays where it is (the wheel and
+ * the keys move it) instead of following the pointer, so hovering near the
+ * edge does not slide the list out from under the mouse.
+ */
+function menuWindow(total, count, anchor) {
+  if (total <= count) return (menuFirst = 0);
+  if (menuFirst < 0) menuFirst = anchor - (count >> 1);
+  else if (anchor < menuFirst) menuFirst = anchor;
+  else if (anchor >= menuFirst + count) menuFirst = anchor - count + 1;
+  return (menuFirst = Math.max(0, Math.min(menuFirst, total - count)));
 }
 
 /** Apply row `idx` of whichever list is open. */
@@ -1119,17 +1131,32 @@ async function handleMouse(code, col, row, press) {
                             && col >= menuBox.left && col < menuBox.left + menuBox.width;
     const rowH = menuBox?.rowH || 1;
     const at = inMenu ? menuBox.first + Math.floor((row - menuBox.top) / rowH) : -1;
+    // the picture renders asynchronously; until the new one is up, its rows
+    // are not the rows on screen, so hover and clicks on them wait
+    const stale = menuBox?.image && menuShownKey !== menuKey;
     // the picture's search field and key hints are part of the menu too
     const inPanel = menuBox?.image && row >= 2 && row < 2 + menuBox.rows
                     && col >= menuBox.left && col < menuBox.left + menuBox.width;
+    if (press && (code & 64) && (code & 3) < 2) {   // wheel scrolls the list
+      const step = (code & 1 ? 1 : -1) * (menuBox?.image ? 2 : 3);
+      const first = menuBox ? menuBox.first : 0;
+      menuFirst = Math.max(0, Math.min(first + step, (menuBox?.total || 0) - (menuBox?.count || 0)));
+      // keep the highlight on whatever is now under the pointer
+      const n = menuBox?.count || 1;
+      if (inMenu) menuHover = Math.min(menuItems().length - 1, menuFirst + Math.floor((row - menuBox.top) / rowH));
+      else menuHover = Math.max(menuFirst, Math.min(menuHover, menuFirst + n - 1));
+      drawMenu(lastLayout || layout());
+      return;
+    }
     if (code === 35 || code === 32) {           // motion
+      if (stale) return;
       const h = at;
       if (h !== menuHover) { menuHover = h; drawMenu(lastLayout); }
       return;
     }
     if (press && code === 0) {
       if (inMenu) {
-        await menuSelect(at);
+        if (!stale) await menuSelect(at);
       } else if (!inPanel) {
         closeMenu();
         await tick(true);
@@ -1424,6 +1451,8 @@ function openMenu(mode = 'preset') {
   menuOpen = true;
   // start on whatever is currently active in this list
   menuHover = Math.max(0, menuItems().findIndex(it => it.active));
+  menuFirst = -1;
+  menuShownKey = null;
   out(`${ESC}[?1003h`);   // report motion even with no button, for hover
   drawMenu(lastLayout || layout());
 }
@@ -1434,12 +1463,18 @@ function menuMove(delta) {
   if (!items.length) return;
   const from = menuHover >= 0 ? menuHover : Math.max(0, items.findIndex(it => it.active));
   menuHover = Math.max(0, Math.min(items.length - 1, from + delta));
+  // scroll just enough to keep the selection in view
+  const n = menuBox?.count || 1;
+  if (menuFirst < 0 || menuHover < menuFirst) menuFirst = menuHover;
+  else if (menuHover >= menuFirst + n) menuFirst = menuHover - n + 1;
   drawMenu(lastLayout || layout());
 }
 
 function closeMenu() {
   menuOpen = false;
   menuHover = -1;
+  menuFirst = -1;
+  menuShownKey = null;
   menuMode = 'preset';
   menuFilter = '';
   // motion reporting stays on - the page uses it for hover
@@ -1877,6 +1912,7 @@ async function main() {
       else if (k >= ' ' && k.length === 1) menuFilter += k;
       else return;
       menuHover = 0;
+      menuFirst = 0;
       // the text list changes length and needs the page repainted under it;
       // the picture keeps its size
       if (!menuBox?.image) { dirty = true; await tick(true); }
