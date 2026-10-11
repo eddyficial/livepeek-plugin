@@ -230,6 +230,7 @@ let cw = 10, ch = 20, termBg = [12, 12, 12];
 let caps = { sixel: false, kitty: false, tmux: false };
 let tickTimer = null;
 let lastShot = null;
+let pendingWipe = null;   // { from, to }: rows an overlay left text in under the image
 let statusMsg = 'starting';
 let errors = [];           // console errors and uncaught exceptions on the page
 let lastFrameAt = 0;       // when the browser last answered a screenshot
@@ -1024,9 +1025,26 @@ function textHit(col, row) {
   return ln.spans.find(s => c >= s.c0 && c < s.c1) || null;
 }
 
+/**
+ * Erase what an overlay left in the cells under the image (uncover): only the
+ * image span, on the rows the image covers; the rest was wiped at once. The
+ * caller writes it in the same write as the image, once the image is encoded,
+ * so the terminal never shows the cleared band on its own.
+ */
+function takeWipe(L) {
+  if (!pendingWipe) return '';
+  let seq = '';
+  const bottom = Math.min(pendingWipe.to, L.top + L.imgRows);
+  for (let r = Math.max(pendingWipe.from, L.top); r < bottom; r++) seq += `${ESC}[${r};${L.left}H${ESC}[${L.imgCols}X`;
+  pendingWipe = null;
+  return seq;
+}
+
 function paintImage(L, composed) {
   if (renderMode === 'text') { paintText(L); return; }
   if (renderMode === 'blocks') {
+    // every cell is rewritten, so nothing an overlay left can survive
+    pendingWipe = null;
     const img = resize(composed, L.imgCols, L.imgRows * 2);
     toHalfBlocks(img).forEach((line, i) => {
       out(`${ESC}[${L.top + i};${L.left}H${line}`);
@@ -1035,10 +1053,9 @@ function paintImage(L, composed) {
   }
 
   const seq = renderMode === 'kitty' ? toKitty(composed) : toSixel(composed, 256);
-  out(`${ESC}[${L.top};${L.left}H`);
   // tmux drops graphics sequences it does not recognise unless they are
   // wrapped; half-blocks are plain text and need no wrapping.
-  out(caps.tmux ? tmuxWrap(seq) : seq);
+  out(takeWipe(L) + `${ESC}[${L.top};${L.left}H` + (caps.tmux ? tmuxWrap(seq) : seq));
 }
 
 /**
@@ -1173,6 +1190,7 @@ async function paint(force) {
         if (dirty) {
           if (caps.kitty || renderMode === 'kitty') out(caps.tmux ? tmuxWrap(kittyClearAll()) : kittyClearAll());
           out(`${ESC}[2J`);
+          pendingWipe = null;     // the clear took it all
           drawHeader(L);
           dirty = false;
         }
@@ -1208,6 +1226,7 @@ async function paint(force) {
         // placed images survive ESC[2J, so they have to be deleted explicitly
         if (caps.kitty || renderMode === 'kitty') out(caps.tmux ? tmuxWrap(kittyClearAll()) : kittyClearAll());
         out(`${ESC}[2J`);
+        pendingWipe = null;       // the clear took it all
         drawHeader(L);
         dirty = false;
       }
@@ -1837,6 +1856,11 @@ function uncover(rows = 0) {
     if (L.left > 1) out(`${ESC}[${r};1H${ESC}[${L.left - 1}X`);
     if (imgRight <= L.cols) out(`${ESC}[${r};${imgRight}H${ESC}[K`);
   }
+  // The cells under the image still hold the overlay's text. Terminals that
+  // draw text above images (xterm.js, so VS Code) would keep showing it
+  // through every later frame, so the next frame wipes them just before it
+  // paints, in the same write: no black band in between.
+  if (renderMode !== 'text') pendingWipe = { from: 2, to: Math.min(2 + n, L.rows - 1) };
   menuBox = null;
   lastShot = null;        // image repaints on the next tick, without a clear
 }
