@@ -1312,10 +1312,20 @@ function closeMenu() {
 function uncover(rows = 0) {
   const L = lastLayout || layout();
   const n = rows || (menuBox ? menuBox.height + 1 : 0) || 4;
-  // Only rows below the image need wiping: the repaint covers the rest, and
+  // Cells under the image are left alone: the repaint covers them, and
   // erasing cells under a sixel shows as a black band until the next frame.
+  // Everything else the overlay touched is wiped. Text mode has no image, and
+  // its text does not follow the image geometry, so whole rows go there.
   const imgBottom = L.top + L.imgRows;
-  for (let r = Math.max(2, imgBottom); r < 2 + n && r < L.rows - 1; r++) out(`${ESC}[${r};1H${ESC}[2K`);
+  const imgRight = L.left + L.imgCols;          // first column past the image
+  for (let r = 2; r < 2 + n && r < L.rows - 1; r++) {
+    if (r >= imgBottom || renderMode === 'text') { out(`${ESC}[${r};1H${ESC}[2K`); continue; }
+    // Beside a narrower image (a phone, a portrait preset) the overlay sticks
+    // out and the repaint never covers it. Those cells are not under the
+    // image, so they can be erased without a black band.
+    if (L.left > 1) out(`${ESC}[${r};1H${ESC}[${L.left - 1}X`);
+    if (imgRight <= L.cols) out(`${ESC}[${r};${imgRight}H${ESC}[K`);
+  }
   menuBox = null;
   lastShot = null;        // image repaints on the next tick, without a clear
 }
