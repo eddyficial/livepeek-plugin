@@ -423,6 +423,10 @@ async function applyControl(s) {
 
   if (s.quit) return shutdown();
 
+  // Asked to show something else: the welcome screen would cover it. A bare
+  // eval or snapshot leaves it up; those read the project behind it anyway.
+  if (welcomeOn && (s.target !== currentTarget || s.preset !== devices[deviceIdx]?.id || s.static)) dismissWelcome();
+
   // run a snippet in the page and report back - lets an agent read state
   // (text on screen, a counter, layout size) instead of guessing from pixels
   if (s.eval) {
@@ -919,6 +923,29 @@ async function paint(force) {
       new Promise((_, rej) => setTimeout(() => rej(new Error('page not responding')), 4000)),
     ]);
     lastFrameAt = Date.now();
+
+    if (welcomeOn) {
+      // the project keeps loading behind the welcome screen, and a snapshot
+      // asked for meanwhile is of the project
+      lastShot = shot;
+      if (SNAPSHOT) writeSnapshot(SNAPSHOT);
+      if (dirty || !welcomePainted) {
+        if (dirty) {
+          if (caps.kitty || renderMode === 'kitty') out(caps.tmux ? tmuxWrap(kittyClearAll()) : kittyClearAll());
+          out(`${ESC}[2J`);
+          drawHeader(L);
+          dirty = false;
+        }
+        const WL = welcomeLayout(L);
+        paintImage(WL, await welcomeFrame(WL));
+        welcomePainted = true;
+        lastStatus = null;   // Windows Terminal wipes the footer under a new sixel
+      }
+      statusMsg = 'live';
+      if (statusMsg + (paused ? ':p' : '') + renderMode + ':' + errors.length !== lastStatus) drawFooter(L);
+      return;
+    }
+
     let changed = !lastShot || Buffer.compare(shot, lastShot) !== 0;
 
     if (renderMode === 'text') {
@@ -936,7 +963,7 @@ async function paint(force) {
       lastShot = shot;
       if (dirty) {
         // placed images survive ESC[2J, so they have to be deleted explicitly
-        if (caps.kitty) out(caps.tmux ? tmuxWrap(kittyClearAll()) : kittyClearAll());
+        if (caps.kitty || renderMode === 'kitty') out(caps.tmux ? tmuxWrap(kittyClearAll()) : kittyClearAll());
         out(`${ESC}[2J`);
         drawHeader(L);
         dirty = false;
@@ -973,18 +1000,17 @@ function cellToPage(col, row) {
 }
 
 async function handleMouse(code, col, row, press) {
-  if (overlay) {
-    // Motion arrives as a press too while any-motion reporting is on; only a
-    // real click closes an overlay. Clicking the device name from the intro
-    // goes straight to the picker it was pointing at.
-    if (!press || (code & 32)) return;
+  // Motion arrives as a press too while any-motion reporting is on; only a
+  // real click or scroll closes the welcome screen or an overlay.
+  if ((welcomeOn || overlay) && (!press || (code & 32))) return;
+  if (welcomeOn) {
+    // clicking the device name it points at goes straight to the picker
     const onHeader = headerHit && row === headerHit.row && col >= headerHit.col0 && col <= headerHit.col1 && (code & 3) === 0;
-    const wasIntro = overlay.kind === 'intro';
-    closeOverlay();
-    if (wasIntro && onHeader) { openMenu(); return; }
-    await tick(true);
-    return;
+    dismissWelcome();
+    if (onHeader) openMenu();
+    return tick(true);
   }
+  if (overlay) { closeOverlay(); await tick(true); return; }
   // menu takes precedence while it's open
   if (menuOpen) {
     const inMenu = menuBox && row >= menuBox.top && row < menuBox.top + menuBox.height
@@ -1158,59 +1184,93 @@ const HELP = [
   ['',        ''],
   ['mouse',   'click, drag, scroll and hover all go to the page'],
 ];
-// Shown to a new user over the top-left of the page, just under the header,
-// so its arrows point at the device name. Paragraphs are wrapped to the pane.
-const INTRO = [
-  'This is your project, live. Save a file and it updates here.',
-  '',
-  '↑ Click the name above, or press space, to see it as a phone, tablet, desktop or game screen.',
-  '',
-  'Clicks and scrolling go to the page. shift+? lists every key.',
-];
-
-/** Greedy word wrap; a word longer than the width is cut when drawn. */
-function wrap(text, width) {
-  const lines = [];
-  let line = '';
-  for (const word of text.split(' ')) {
-    if (line && (line + ' ' + word).length > width) { lines.push(line); line = word; }
-    else line = line ? line + ' ' + word : word;
-  }
-  lines.push(line);
-  return lines;
-}
-
 function drawOverlay(L) {
   if (!overlay) return;
   const width = Math.min(L.cols - 2, 72);
-  let lines = overlay.kind === 'intro'
-    ? overlay.text.flatMap(p => wrap(p, width - 4).map(l => '  ' + l))
-    : overlay.rows.map(([k, d]) => `  ${k.padEnd(7)} ${d}`);
   // title on row 2, the action line under the last row, and the pane's own
   // footer on the bottom row must all survive a short pane
-  lines = lines.slice(0, Math.max(1, L.rows - 4));
+  const lines = overlay.rows.map(([k, d]) => `  ${k.padEnd(7)} ${d}`).slice(0, Math.max(1, L.rows - 4));
   out(`${ESC}[2;2H${C.head((' ' + overlay.title + ' ').padEnd(width).slice(0, width))}`);
   lines.forEach((text, i) => {
     const line = text.padEnd(width).slice(0, width);
     out(`${ESC}[${3 + i};2H${ESC}[48;5;236m${ESC}[38;5;252m${line}${ESC}[0m`);
   });
-  const action = overlay.kind === 'intro' ? '  any key or click to start' : '  any key to close';
-  out(`${ESC}[${3 + lines.length};2H${ESC}[48;5;236m${ESC}[38;5;245m${action.padEnd(width).slice(0, width)}${ESC}[0m`);
+  out(`${ESC}[${3 + lines.length};2H${ESC}[48;5;236m${ESC}[38;5;245m${'  any key to close'.padEnd(width)}${ESC}[0m`);
   overlay.height = lines.length + 2;   // what closeOverlay has to wipe
 }
 function openOverlay(title, rows) {
-  overlay = { kind: 'table', title, rows };
-  drawOverlay(lastLayout || layout());
-}
-function openIntro() {
-  overlay = { kind: 'intro', title: '↑ welcome to livepeek', text: INTRO };
+  overlay = { title, rows };
   drawOverlay(lastLayout || layout());
 }
 function closeOverlay() {
   if (!overlay) return;
-  const n = overlay.height || (overlay.rows ? overlay.rows.length + 2 : 4);
+  const n = overlay.height || overlay.rows.length + 2;
   overlay = null;
   uncover(n);
+}
+
+// ------------------------------------------------------------- welcome ----
+// A new user gets a welcome screen in place of the page: what the pane is,
+// and that the device name above it is a menu. It is drawn by a second,
+// private browser tab and painted over the whole image area, so the project
+// keeps loading behind it and snapshots still show the project. Any key or
+// click puts the project on screen. lib/intro.mjs decides when it is due.
+let welcomeOn = false;
+let welcomePainted = false;
+let welcomeTab = null;
+let welcomeImg = null;          // { key, img } decoded at the current pane size
+
+const WELCOME_HTML = `<!doctype html><html><head><meta charset="utf-8"><style>
+*{box-sizing:border-box;margin:0}
+html,body{height:100%}
+body{background:#14161b;color:#d4d7de;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
+  display:flex;flex-direction:column;padding:clamp(10px,3.5vw,28px);font-size:clamp(13px,3.6vw,19px);line-height:1.45}
+.pick{display:flex;gap:.7em;align-items:flex-start;color:#7cc4ff}
+.arrow{font-size:2.6em;line-height:.8;font-weight:300}
+.pick b{display:block;font-size:1.15em;color:#a9d8ff}
+.chips{display:flex;flex-wrap:wrap;gap:.35em;margin-top:.45em}
+.chips span{border:1px solid #2f4a63;background:#182533;color:#9cc9ef;border-radius:999px;padding:.05em .7em;font-size:.82em}
+main{flex:1;display:flex;flex-direction:column;justify-content:center;gap:.8em;max-width:34em}
+h1{font-size:1.75em;line-height:1.15;color:#fff;font-weight:650}
+p{color:#aab0bc}
+kbd{font-family:inherit;border:1px solid #3a3f4a;border-bottom-width:2px;border-radius:5px;padding:0 .35em;font-size:.85em;color:#d4d7de}
+.go{align-self:flex-start;margin-top:.4em;background:#2563eb;color:#fff;border-radius:999px;padding:.45em 1.1em;font-size:.9em;font-weight:600}
+</style></head><body>
+<div class="pick"><div class="arrow">&#8593;</div><div><b>Pick a device up here</b>
+<div class="chips"><span>phone</span><span>tablet</span><span>desktop</span><span>game</span></div></div></div>
+<main><h1>Welcome to livepeek</h1>
+<p>This pane shows your project, live. Save a file and it updates here.</p>
+<p>Click and scroll go to the page. <kbd>space</kbd> opens the device list, <kbd>shift</kbd>+<kbd>?</kbd> lists every key.</p>
+<div class="go">Click anywhere to start</div></main>
+</body></html>`;
+
+/** The whole area below the header, rather than the device's aspect ratio. */
+function welcomeLayout(L) {
+  const imgCols = Math.max(4, L.cols - 2);
+  const imgRows = Math.max(4, L.rows - 4);
+  return { ...L, left: 2, top: 2, imgCols, imgRows, W: Math.round(imgCols * cw), H: Math.round(imgRows * ch) };
+}
+
+async function welcomeFrame(WL) {
+  const key = `${WL.W}x${WL.H}`;
+  if (welcomeImg?.key === key) return welcomeImg.img;
+  const size = { width: WL.W, height: WL.H };
+  if (!welcomeTab) {
+    welcomeTab = await browser.newPage({ viewport: size, deviceScaleFactor: 1 });
+    await welcomeTab.setContent(WELCOME_HTML);
+  } else {
+    await welcomeTab.setViewportSize(size);
+  }
+  welcomeImg = { key, img: decodePng(await welcomeTab.screenshot({ type: 'png' })) };
+  return welcomeImg.img;
+}
+
+function dismissWelcome() {
+  welcomeOn = false;
+  welcomeImg = null;
+  // the welcome screen is wider than a phone frame, so clear it all away
+  dirty = true; lastShot = null;
+  if (welcomeTab) { welcomeTab.context().close().catch(() => {}); welcomeTab = null; }
 }
 
 function openMenu(mode = 'preset') {
@@ -1523,6 +1583,16 @@ async function main() {
   const ctx = await browser.newContext({ viewport: vp(), deviceScaleFactor: 2 });
   page = await ctx.newPage();
 
+  // Text mode has no picture to paint a welcome screen with.
+  if (renderMode !== 'text' && intro.due()) {
+    welcomeOn = true;
+    intro.shown();
+    try {
+      paintImage(welcomeLayout(lastLayout), await welcomeFrame(welcomeLayout(lastLayout)));
+      welcomePainted = true;
+    } catch { /* the render loop tries again */ }
+  }
+
   // Errors are the first thing a user wants to know and the one thing a
   // screenshot cannot show. Keep the last few; a navigation starts afresh.
   // The count is published too, so an agent reading the session file sees it.
@@ -1572,16 +1642,6 @@ async function main() {
 
   // one loop drives both the repaint and the shared-pane check
   tickTimer = setInterval(() => { tick(); checkControl(); }, INTERVAL);
-
-  // A new user gets told what the pane is and where the device menu is. The
-  // delay lets the first frame land; tick() redraws the card over any later one.
-  if (intro.due()) {
-    setTimeout(() => {
-      if (overlay || menuOpen || typing || !intro.due()) return;
-      intro.shown();
-      openIntro();
-    }, 900);
-  }
   clearInterval(startBeat);       // tick keeps the heartbeat from here on
   // Dragging a pane border fires resize dozens of times; only the size it
   // settles on is worth a viewport change. A failure here has nobody above it
@@ -1617,6 +1677,14 @@ async function main() {
       return sendToPage(ev);
     }
 
+    // Any key takes the welcome screen away; space goes on to the device
+    // list the screen points at. Alt and ctrl chords belong to the terminal.
+    if (welcomeOn && !ev.alt && !ev.ctrl) {
+      dismissWelcome();
+      if (ev.t === 'char' && ev.ch === ' ') { lastSpaceAt = ev.at || Date.now(); openMenu('preset'); }
+      return tick(true);
+    }
+
     // Named keys drive the picker, so it is not mouse-only. Outside the
     // picker they are ignored rather than falling through - alt+arrow in
     // particular belongs to the terminal, not to us.
@@ -1636,13 +1704,7 @@ async function main() {
     const k = ev.ch;
     if (ev.alt) return;                 // alt+letter is not one of our bindings
 
-    if (overlay) {
-      // the intro says "press space", so space goes where it pointed
-      const toPicker = overlay.kind === 'intro' && k === ' ';
-      closeOverlay();
-      if (toPicker) { lastSpaceAt = ev.at || Date.now(); openMenu('preset'); return; }
-      return tick(true);
-    }
+    if (overlay) { closeOverlay(); return tick(true); }
 
     // while the device picker is open, letters narrow the list. Space still
     // closes an untouched picker, but once a filter is started it is part of
