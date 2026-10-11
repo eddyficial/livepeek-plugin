@@ -5,43 +5,84 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>livepeek</title>
 <style>
-  :root { --bg:#0f1220; --card:#181c30; --text:#e8ebf7; --muted:#9aa3c7; --accent:#7c9cff; --accent2:#ff7cc8; }
-  * { box-sizing:border-box; margin:0; }
+  :root {
+    --bg:#0d0f12; --ink:#eceae4; --soft:#a3a29c; --faint:#878b85; --line:#24272b;
+    --well:#15181c; --live:#8be28b;
+    --serif: "Iowan Old Style","Palatino Linotype",Palatino,Georgia,ui-serif,serif;
+    --mono: "Cascadia Mono","SF Mono",ui-monospace,Menlo,Consolas,monospace;
+    color-scheme: dark;
+  }
+  /* always dark: the browser behind the pane reports light by default, and a
+     light page would glare inside a dark terminal */
+  * { box-sizing:border-box; margin:0; padding:0; }
   html, body { min-height:100%; }
+  body {
+    font: 16px/1.55 system-ui,"Segoe UI",sans-serif; color:var(--ink); background:var(--bg);
+    display:flex; min-height:100vh; padding:clamp(18px,5vw,48px);
+    /* a faint dot grid, a texture rather than a pattern */
+    background-image: radial-gradient(circle at 1px 1px, var(--line) 1px, transparent 0);
+    background-size: 22px 22px;
+  }
   /* centred with margin:auto, not align-items: in a pane shorter than the page
      that keeps the top reachable instead of spilling it above the scroll */
-  body { font-family:system-ui,Segoe UI,sans-serif; background:var(--bg); color:var(--text); display:flex; min-height:100vh; padding:clamp(16px,6vw,32px); }
-  main { max-width:520px; width:100%; margin:auto; }
-  h1 { font-size:clamp(1.9rem,8vw,2.6rem); line-height:1.1; background:linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip:text; background-clip:text; color:transparent; }
-  p.lead { color:var(--muted); font-size:1.1rem; margin:14px 0 30px; }
-  ol { list-style:none; padding:0; display:grid; gap:12px; }
-  li { background:var(--card); border-radius:14px; padding:16px 18px; display:flex; gap:14px; align-items:flex-start; }
-  li b { color:var(--accent); font-size:1.1rem; min-width:22px; }
-  li span { color:var(--muted); }
-  code { background:#0b0e1c; padding:2px 7px; border-radius:6px; color:var(--text); font-size:.95em; }
-  .keys { margin-top:28px; display:flex; flex-wrap:wrap; gap:8px 18px; color:var(--muted); font-size:.95rem; }
-  kbd { background:#0b0e1c; border:1px solid #2a2f4a; border-bottom-width:3px; border-radius:6px; padding:2px 8px; color:var(--text); font-family:inherit; }
-  footer { margin-top:26px; color:#5d6690; font-size:.85rem; }
+  main { width:100%; max-width:540px; margin:auto; position:relative; }
+  main::before {               /* a soft plate behind the text so the grid stays behind it */
+    content:""; position:absolute; inset:-28px -32px; z-index:-1;
+    background: radial-gradient(closest-side, var(--bg) 72%, transparent);
+  }
+
+  .status { font:12px/1 var(--mono); color:var(--soft); display:flex; align-items:center; gap:10px;
+            letter-spacing:.02em; margin-bottom:clamp(18px,5vh,52px); }
+  .status b { color:var(--ink); font-weight:600; }
+  .status .sep { color:var(--faint); }
+  .dot { width:7px; height:7px; border-radius:50%; background:var(--live); position:relative; flex:none; }
+  .dot::after { content:""; position:absolute; inset:-4px; border-radius:50%; border:1px solid var(--live);
+                opacity:0; animation:ping 2.4s ease-out infinite; }
+  @keyframes ping { 0% { transform:scale(.4); opacity:.9 } 80%,100% { transform:scale(1.6); opacity:0 } }
+
+  h1 { font:400 clamp(2.1rem,9vw,3.1rem)/1.05 var(--serif); letter-spacing:-.015em; }
+  h1 em { color:var(--soft); }
+  .lead { color:var(--soft); margin:12px 0 clamp(18px,4.5vh,40px); max-width:34em; }
+
+  .label { font:11px/1 var(--mono); text-transform:uppercase; letter-spacing:.14em; color:var(--faint);
+           margin-bottom:12px; }
+  /* quoted examples, not buttons: nothing in the pane is there to click */
+  .asks { list-style:none; display:grid; gap:2px; }
+  .asks li { padding:clamp(5px,1vh,8px) 0 clamp(5px,1vh,8px) 16px; border-left:2px solid var(--live);
+             font:italic 400 1.06rem/1.4 var(--serif); color:var(--ink); }
+  .asks li::before { content:open-quote; }
+  .asks li::after { content:close-quote; }
+
+  .or { color:var(--soft); font-size:.95rem; margin-top:16px; }
+  code { font:.86em var(--mono); color:var(--ink); background:var(--well); border:1px solid var(--line);
+         border-radius:5px; padding:1px 5px; }
+
+  .keys { margin-top:clamp(18px,4.5vh,48px); padding-top:14px; border-top:1px solid var(--line);
+          display:flex; flex-wrap:wrap; gap:6px 18px; font:12px/1.6 var(--mono); color:var(--faint); }
+  kbd { font:inherit; color:var(--ink); }
 </style>
 </head>
 <body>
 <main>
-  <h1>livepeek is ready</h1>
-  <p class="lead">This pane shows whatever you build, live, as you save. There is nothing to show in this folder yet, and this page will switch to your work the moment a file appears.</p>
-  <ol>
-    <li><b>1</b><span>Ask Claude to build something: a website, a game, a phone app, a document. Or create an <code>index.html</code> here yourself.</span></li>
-    <li><b>2</b><span>Save. This pane updates on its own a moment later.</span></li>
-    <li><b>3</b><span>Click, scroll and hover with your mouse. Press <kbd>i</kbd> to type into the page.</span></li>
-  </ol>
+  <div class="status"><span class="dot"></span><b>livepeek</b><span class="sep">/</span><span>watching this folder</span></div>
+
+  <h1>Nothing here <em>yet.</em></h1>
+  <p class="lead">Save a page in this folder and it shows up right here, the moment you do. No refresh, no browser tab.</p>
+
+  <p class="label">Say to Claude, for example</p>
+  <ul class="asks">
+    <li>Build a landing page for a coffee shop</li>
+    <li>Make a small snake game I can play here</li>
+    <li>Sketch a phone app for tracking habits</li>
+  </ul>
+  <p class="or">Or make an <code>index.html</code>, any <code>.html</code> or a <code>.md</code> file yourself. Project somewhere else? Run <code>/livepeek:livepeek</code> there and this pane follows.</p>
+
   <div class="keys">
     <span><kbd>space</kbd> device</span>
     <span><kbd>p</kbd> project</span>
-    <span><kbd>shift</kbd>+<kbd>?</kbd> all keys</span>
-    <span><kbd>e</kbd> errors</span>
-    <span><kbd>d</kbd> dark/light</span>
+    <span><kbd>shift ?</kbd> all keys</span>
     <span><kbd>q</kbd> quit</span>
   </div>
-  <footer>Have a project elsewhere? Run <code>/livepeek:livepeek</code> from that folder and this pane will switch to it.</footer>
 </main>
 </body>
 </html>
