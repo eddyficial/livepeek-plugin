@@ -212,6 +212,18 @@ function detectHost() {
   return null;
 }
 
+// wt.exe is an app-execution alias in %LOCALAPPDATA%\Microsoft\WindowsApps.
+// That folder is on PATH by default, but shells that build their own PATH
+// (Git Bash, some IDE terminals) can drop it, so use the full path when the
+// alias is there. fs.existsSync reports false for these aliases, so the
+// folder is listed instead.
+function wtExe() {
+  const dir = process.env.LOCALAPPDATA
+    && path.join(process.env.LOCALAPPDATA, 'Microsoft', 'WindowsApps');
+  try { if (dir && fs.readdirSync(dir).includes('wt.exe')) return path.join(dir, 'wt.exe'); } catch { /* not there */ }
+  return 'wt.exe';
+}
+
 const splitters = {
   tmux: () => ['tmux', [
     'split-window',
@@ -247,7 +259,7 @@ const splitters = {
   // argument, which turns "C:\Program Files\nodejs\node.exe" into a request
   // to run C:\Program. wt closes the pane when the command exits either way,
   // which was the only reason cmd was in the chain.
-  wt: () => ['wt.exe', [
+  wt: () => [wtExe(), [
     '-w', '0', 'split-pane',
     flag('--horizontal') ? '--horizontal' : '--vertical',
     '--size', String(SIZE),
