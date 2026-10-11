@@ -556,6 +556,47 @@ let menuHover = -1;
 let menuFirst = -1;      // first entry in view; -1 centres the selection on the next draw
 let menuBox = null;      // {top,left,width,height,first,count, rowH,rows,image}
 let headerHit = null;    // {row,col0,col1}
+let linkHit = null;      // {row,col0,col1,href}: the page address in the header
+
+/**
+ * A target worth opening in a browser, normalised by URL: an http(s) address
+ * in pure ASCII (punycode host, percent-encoded path), so it is safe both to
+ * print in the header and to hand to the system opener. Null otherwise.
+ */
+function openable(target) {
+  try {
+    const u = new URL(target);
+    return u.protocol === 'http:' || u.protocol === 'https:' ? u.href : null;
+  } catch { return null; }
+}
+
+/** The page's address as the header shows it, or '' when there is none worth opening. */
+function linkLabel(href) {
+  return href ? href.replace(/^https?:\/\//, '').replace(/\/$/, '') + ' ↗' : '';
+}
+
+/**
+ * Open the page in the system's own browser, full size, for a closer look
+ * than the pane can give. rundll32 rather than `start`: cmd would split the
+ * URL at every & in a query string. A click passes the address it was drawn
+ * with, so a retarget in between cannot open something else.
+ */
+async function openInBrowser(href = openable(currentTarget)) {
+  if (!href) return;
+  const { spawn } = await import('node:child_process');
+  const [cmd, args] = process.platform === 'win32' ? ['rundll32', ['url.dll,FileProtocolHandler', href]]
+    : process.platform === 'darwin' ? ['open', [href]]
+    : ['xdg-open', [href]];
+  const failed = () => { statusMsg = '!could not open a browser'; drawFooter(lastLayout || layout()); };
+  try {
+    const child = spawn(cmd, args, { detached: true, stdio: 'ignore' });
+    child.on('error', failed);           // a missing opener fails here, not in spawn()
+    child.unref();
+    statusMsg = 'opened in your browser';
+    drawFooter(lastLayout || layout());
+  } catch { failed(); }
+}
+const onLink = (col, row) => linkHit && row === linkHit.row && col >= linkHit.col0 && col <= linkHit.col1;
 
 const C = {
   dim:   (s) => `${ESC}[38;5;244m${s}${ESC}[0m`,
@@ -564,6 +605,7 @@ const C = {
   bad:   (s) => `${ESC}[38;5;203m${s}${ESC}[0m`,
   sel:   (s) => `${ESC}[48;5;24m${ESC}[38;5;231m${s}${ESC}[0m`,
   head:  (s) => `${ESC}[38;5;75m${s}${ESC}[0m`,
+  link:  (s) => `${ESC}[4;38;5;117m${s}${ESC}[0m`,   // underlined: it opens in the browser
   // typing mode is a modal state that changes what every key does, so it gets
   // a reversed badge rather than just a colour
   key:   (s) => `${ESC}[48;5;178m${ESC}[38;5;16m ${s} ${ESC}[0m`,
@@ -632,16 +674,21 @@ function drawHeader(L) {
     ? `${v.width}x${v.height}  @${d.dpr}x  ${d.os}${landscape ? '  landscape' : ''}`
     : `${v.width}x${v.height}  ${d.os}${landscape ? '  landscape' : ''}`;
 
-  // drop the metadata before letting the header wrap
+  // drop the metadata before letting the header wrap; the link goes last
   if (zoom !== 1) meta += `  ×${zoom}`;
   if (colorScheme) meta += `  ${colorScheme}`;
-  const budget = L.cols - label.length - 5;
+  const href = openable(currentTarget);
+  let link = linkLabel(href);
+  if (link && link.length > L.cols - label.length - 7) link = '';
+  const budget = L.cols - label.length - 5 - (link ? link.length + 2 : 0);
   if (meta.length > budget) meta = budget > 1 ? meta.slice(0, budget - 1) + '…' : '';
 
   out(`${ESC}[1;1H${ESC}[2K`);
-  out(' ' + C.head(label + '▾') + (meta ? '  ' + C.dim(meta) : ''));
-  // the clickable region is the name plus its chevron
+  out(' ' + C.head(label + '▾') + (link ? '  ' + C.link(link) : '') + (meta ? '  ' + C.dim(meta) : ''));
+  // the clickable regions: the name plus its chevron, and the address
   headerHit = { row: 1, col0: 2, col1: 2 + label.length };
+  const linkCol = 2 + label.length + 1 + 2;
+  linkHit = link ? { row: 1, col0: linkCol, col1: linkCol + link.length - 1, href } : null;
 }
 
 function drawFooter(L) {
@@ -1169,6 +1216,7 @@ async function handleMouse(code, col, row, press) {
   if (welcomeOn) {
     // clicking the device name it points at goes straight to the picker
     const onHeader = headerHit && row === headerHit.row && col >= headerHit.col0 && col <= headerHit.col1 && (code & 3) === 0;
+    if ((code & 3) === 0 && onLink(col, row)) return openInBrowser(linkHit.href);
     dismissWelcome();
     if (onHeader) openMenu();
     return tick(true);
@@ -1230,6 +1278,7 @@ async function handleMouse(code, col, row, press) {
   }
   if (press && renderMode === 'text' && button === 0) {
     if (headerHit && row === headerHit.row && col >= headerHit.col0 && col <= headerHit.col1) { openMenu(); return; }
+    if (onLink(col, row)) return openInBrowser(linkHit.href);
     const hit = textHit(col, row);
     if (!hit) return;
     // VS Code's terminal has been seen delivering one click as two presses
@@ -1278,6 +1327,7 @@ async function handleMouse(code, col, row, press) {
       openMenu();
       return;
     }
+    if (button === 0 && onLink(col, row)) return openInBrowser(linkHit.href);
     if (!pt) return;
     const name = button === 1 ? 'middle' : button === 2 ? 'right' : 'left';
     const now = Date.now();
@@ -1361,6 +1411,7 @@ const HELP = [
   ['d',       'dark / light  (flips prefers-color-scheme)'],
   ['+  -',    'zoom in / out  (0 resets)'],
   ['c',       'copy the frame to the clipboard'],
+  ['w',       'open the page in your browser  (or click its address)'],
   ['b',       'change renderer: kitty, sixel, text, half-blocks'],
   ['shift+?', 'this help'],
   ['q',       'quit'],
@@ -2032,6 +2083,7 @@ async function main() {
       dirty = true; lastShot = null; await tick(true);
     }
     else if (k === 'c') { await copyFrame(); }
+    else if (k === 'w') { await openInBrowser(); }
   }
 
   process.stdin.on('data', (chunk) => {

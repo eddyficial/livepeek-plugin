@@ -1,7 +1,7 @@
 ---
 name: livepeek
 description: Open a live view of whatever the user is building - a website, a game, a phone app, a document, a mockup - in a split terminal pane, and look at it yourself after making changes. Use when the user says "/livepeek:livepeek", "show me", "open the preview", "let me see it", "start the emulator", "view the site", "preview this file", or asks to watch what they are building while they edit. Also use after editing UI, game or document files to verify the change visually, and for "the preview is blank / looks wrong".
-version: 0.6.3
+version: 0.6.4
 ---
 
 # livepeek: a live viewing portal in the terminal
@@ -234,6 +234,7 @@ Focus the pane first (`alt`+arrow in most terminals, `prefix`+arrow in tmux).
 | `d` | toggle dark / light by emulating `prefers-color-scheme` |
 | `+` `-` `0` | zoom in / out / reset (CSS zoom, viewport unchanged) |
 | `c` | copy the current frame to the system clipboard |
+| `w` | open the page in the system browser for a full-size look; clicking the underlined address in the header does the same |
 | `.` | pause refreshing |
 | `b` | cycle renderer: kitty, sixel, text, half-blocks |
 | `q` | quit and close the pane |

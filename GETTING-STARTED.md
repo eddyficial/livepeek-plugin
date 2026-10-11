@@ -90,10 +90,10 @@ building: a phone frame around it would misrepresent it.
 
 You do not have to be in a Claude session. Copy a wrapper from the installed
 plugin cache into a folder on your PATH. With the default Claude configuration,
-version 0.6.3 is under:
+version 0.6.4 is under:
 
 ```
-~/.claude/plugins/cache/livepeek/livepeek/0.6.3/bin/
+~/.claude/plugins/cache/livepeek/livepeek/0.6.4/bin/
 ```
 
 On Windows, copy `livepeek.cmd`. On macOS or Linux, copy `livepeek` and make it
@@ -133,6 +133,7 @@ Once it's focused:
 | `d` | flip dark / light mode |
 | `+` `-` `0` | zoom in, out, reset |
 | `c` | copy what you see to the clipboard |
+| `w` | open the page in your browser (or click the address at the top) |
 | `.` | pause updating |
 | `b` | change renderer (kitty, sixel, text, half-blocks) |
 | `q` | quit and close the pane |
