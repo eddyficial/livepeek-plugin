@@ -1,15 +1,14 @@
-// Projects peek has shown before, so the `p` picker can switch to any of
+// Projects livepeek has shown before, so the `p` picker can switch to any of
 // them - not only to dev servers that happen to be running right now.
 //
 // One JSON file, most recent first, capped so it never grows unbounded.
 // Entries whose folder has since been deleted are dropped on read.
 
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { STATE_DIR } from './state.mjs';
 
-const DIR = path.join(os.homedir(), '.peek');
-const FILE = path.join(DIR, 'projects.json');
+const FILE = path.join(STATE_DIR, 'projects.json');
 const MAX = 20;
 
 /**
@@ -40,7 +39,7 @@ export function remember(project) {
   const rest = list().filter(p => path.resolve(p.dir) !== dir);
   const next = [{ ...project, dir, at: Date.now() }, ...rest].slice(0, MAX);
   try {
-    fs.mkdirSync(DIR, { recursive: true });
+    fs.mkdirSync(STATE_DIR, { recursive: true });
     fs.writeFileSync(FILE, JSON.stringify(next, null, 1));
   } catch { /* remembering is a convenience, never worth failing a launch */ }
 }

@@ -290,7 +290,7 @@ async function main() {
   // --snapshot alone: ask the open pane to write what it is showing, and
   // wait for it. This is how an agent sees the pane.
   if (SNAPSHOT && !open && argv.length <= 2) {
-    die('no livepeek pane is open to snapshot. Run peek first, then --snapshot.');
+    die('no livepeek pane is open to snapshot. Run livepeek first, then --snapshot.');
   }
   /** Wait for the open pane to report the snapshot asked for. */
   const awaitSnapshot = async (file) => {
@@ -393,7 +393,7 @@ async function main() {
       '     (Cmd+\\ on a Mac).\n' +
       '  2. In the new half run:\n' +
       `       node ${path.join(__dirname, 'pane.mjs')} --here\n` +
-      '     (or just: peek --here, if the peek command is installed)\n\n' +
+      '     (or just: livepeek --here, if the livepeek command is installed)\n\n' +
       'For pictures instead of text, turn on the VS Code setting\n' +
       '  terminal.integrated.enableImages\n' +
       'and reload the window (Developer: Reload Window). Without it livepeek shows the page as text.\n\n' +

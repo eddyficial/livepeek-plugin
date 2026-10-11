@@ -1,9 +1,9 @@
 /**
- * Shared test plumbing for peek: temp HOME, test()/eq()/assert() harness,
+ * Shared test plumbing for livepeek: temp HOME, test()/eq()/assert() harness,
  * result counters, a static-server helper and a raw HTTP GET.
  *
  * Import this module FIRST. It points HOME at a throwaway directory before any
- * peek module is loaded: projects.mjs and session.mjs read os.homedir() at load
+ * livepeek module is loaded: state.mjs reads os.homedir() at load
  * time and must never touch the real one.
  *
  * No child processes or browsers are started here.
@@ -21,7 +21,7 @@ export const SCRIPTS = path.join(ROOT, 'scripts');
 // browser suite (it needs the real profile, not the throwaway one).
 export const REAL_HOME = { HOME: process.env.HOME, USERPROFILE: process.env.USERPROFILE };
 
-export const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'peek-test-'));
+export const TMP = fs.mkdtempSync(path.join(os.tmpdir(), 'livepeek-test-'));
 export const HOME = path.join(TMP, 'home');
 fs.mkdirSync(HOME);
 process.env.HOME = HOME;

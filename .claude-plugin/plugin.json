@@ -1,13 +1,13 @@
 {
   "name": "livepeek",
   "displayName": "livepeek",
-  "version": "0.4.3",
+  "version": "0.5.0",
   "description": "A live viewing portal in your terminal. Whatever you are building - a website, a game, a phone app, a document - renders in a split pane as you edit it, and Claude can snapshot the pane to check its own changes. Clickable, scrollable, typeable. No browser window, no emulator, nothing to install in your project.",
   "author": {
     "name": "eddyficial"
   },
-  "homepage": "https://github.com/eddyficial/peek",
-  "repository": "https://github.com/eddyficial/peek",
+  "homepage": "https://github.com/eddyficial/livepeek",
+  "repository": "https://github.com/eddyficial/livepeek",
   "license": "MIT",
   "keywords": [
     "preview", "terminal", "live-reload", "sixel", "kitty-graphics",

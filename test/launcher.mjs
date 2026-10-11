@@ -14,7 +14,7 @@ function safeEnv(extra = {}) {
   return { ...env, ...extra };
 }
 
-/** Run a peek script as a child with a clean, multiplexer-free environment. */
+/** Run a livepeek script as a child with a clean, multiplexer-free environment. */
 function run(script, args, cwd) {
   const env = safeEnv({ HOME, USERPROFILE: HOME });
   for (const k of ['TMUX', 'ZELLIJ', 'KITTY_LISTEN_ON', 'WEZTERM_PANE', 'WT_SESSION']) delete env[k];

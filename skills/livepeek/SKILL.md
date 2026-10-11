@@ -1,6 +1,6 @@
 ---
-name: peek
-description: Open a live view of whatever the user is building - a website, a game, a phone app, a document, a mockup - in a split terminal pane, and look at it yourself after making changes. Use when the user says "/livepeek:peek", "show me", "open the preview", "let me see it", "start the emulator", "view the site", "preview this file", or asks to watch what they are building while they edit. Also use after editing UI, game or document files to verify the change visually, and for "the preview is blank / looks wrong".
+name: livepeek
+description: Open a live view of whatever the user is building - a website, a game, a phone app, a document, a mockup - in a split terminal pane, and look at it yourself after making changes. Use when the user says "/livepeek:livepeek", "show me", "open the preview", "let me see it", "start the emulator", "view the site", "preview this file", or asks to watch what they are building while they edit. Also use after editing UI, game or document files to verify the change visually, and for "the preview is blank / looks wrong".
 version: 0.4.0
 ---
 
@@ -23,7 +23,7 @@ once (`npm add --global playwright-core@1.63.0`). livepeek downloads nothing its
 ## Launching it
 
 ```bash
-peek
+livepeek
 ```
 
 Self-contained: it finds the project root, works out which framework it is,
@@ -59,11 +59,11 @@ can. After you edit a screen, a level, a page or a document, do not ask the
 user whether it looks right - check:
 
 ```bash
-peek --snapshot .peek/snapshot.png
+livepeek --snapshot .livepeek/snapshot.png
 ```
 
 then read the PNG with the Read tool. The path is relative to the project and
-livepeek creates the `.peek` folder if it is missing; `/tmp` does not exist on
+livepeek creates the `.livepeek` folder if it is missing; `/tmp` does not exist on
 Windows, so do not reach for it. It is the page at full resolution (the
 same thing the pane is painting), so text is legible. Wait a couple of seconds
 after saving a file first; the dev server or the built-in reloader needs a
@@ -72,8 +72,8 @@ moment to pick the change up.
 When pixels are not enough, ask the page directly:
 
 ```bash
-peek --eval 'document.querySelector("h1").textContent'
-peek --eval '[innerWidth, innerHeight]'
+livepeek --eval 'document.querySelector("h1").textContent'
+livepeek --eval '[innerWidth, innerHeight]'
 ```
 
 Both need a pane to be open. If the user said "change X" and X is visible in
@@ -124,7 +124,7 @@ an `index.html`, `.html` or `.md` the moment one appears, with no relaunch. If t
 meant a specific file or server, give it `--file` or `--url`; do not guess a port.
 
 **"The browser driver is not installed"** (shown inside the pane, or by
-`peek --doctor`): livepeek downloads nothing itself. Tell the user to run
+`livepeek --doctor`): livepeek downloads nothing itself. Tell the user to run
 `npm add --global playwright-core@1.63.0` once (or add the same package to the project's
 dev dependencies), then launch again. Ask before running it for them; it is
 an install on their machine.
@@ -139,7 +139,7 @@ it modifies their `package.json`.
 
 **`3` in the VS Code terminal** (the message names VS Code). Nothing can
 split that terminal from outside, so tell the user to split it by hand
-(Ctrl+Shift+5, or Cmd+\ on a Mac) and run `peek --here` (or the full
+(Ctrl+Shift+5, or Cmd+\ on a Mac) and run `livepeek --here` (or the full
 `node .../pane.mjs --here` the message prints) in the new half. Do not run
 `--here` yourself: it would take over the terminal you are working in. If
 the pane then shows text rather than a picture, the VS Code setting
@@ -153,12 +153,12 @@ entire point of this plugin.
 
 ## Errors on the page
 
-The session file `~/.peek/session.json` carries `errors`, the number of
+The session file `~/.livepeek/session.json` carries `errors`, the number of
 uncaught exceptions and `console.error` calls on the current page since it
 loaded. After you change something, read it along with the snapshot:
 
 ```bash
-node -e "console.log(JSON.parse(require('fs').readFileSync(require('os').homedir()+'/.peek/session.json')).errors)"
+node -e "console.log(JSON.parse(require('fs').readFileSync(require('os').homedir()+'/.livepeek/session.json')).errors)"
 ```
 
 A non-zero count means your change broke something even if the page still
@@ -196,7 +196,7 @@ Focus the pane first (`alt`+arrow in most terminals, `prefix`+arrow in tmux).
 | click / scroll | goes through to the page |
 | `i` | typing mode: keystrokes go to the page; `esc` stops |
 | `space` | device picker: typing filters the list (`iph`, `sam`, `pixel`, `desk`) |
-| `p` | switch project: folders livepeek has shown before (kept in `~/.peek/projects.json`), plus any dev server currently running; picking a stopped framework project starts its dev server |
+| `p` | switch project: folders livepeek has shown before (kept in `~/.livepeek/projects.json`), plus any dev server currently running; picking a stopped framework project starts its dev server |
 | `shift`+`?` | help overlay listing every key |
 | `[` `]` | previous / next device |
 | `o` | rotate |

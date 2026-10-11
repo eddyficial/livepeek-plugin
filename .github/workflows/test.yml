@@ -18,7 +18,7 @@ jobs:
         with:
           node-version: 20
 
-      # the browser driver peek fetches on first run; pinned to the same
+      # the browser driver livepeek uses; pinned to the same
       # version tui.mjs installs
       - name: Install playwright-core
         run: npm i --no-save playwright-core@1.63.0 --prefix scripts
@@ -50,7 +50,7 @@ jobs:
             walk(base, 0);
             console.log("chromium candidates:", found);
             if (!found.length) { console.error("no chromium found under " + base); process.exit(1); }
-            fs.appendFileSync(process.env.GITHUB_ENV, "PEEK_BROWSER=" + found[0] + "\n");
+            fs.appendFileSync(process.env.GITHUB_ENV, "LIVEPEEK_BROWSER=" + found[0] + "\n");
           '
 
       - name: Test

@@ -1,6 +1,6 @@
 // Where the browser driver (playwright-core, or full playwright) may be.
 //
-// peek installs nothing itself, so the driver has to be found wherever the
+// livepeek installs nothing itself, so the driver has to be found wherever the
 // user put it: a global `npm install -g`, the project's own node_modules, or
 // a copy next to these scripts. tui.mjs and doctor.mjs share this list so
 // the two can never disagree about whether the driver is there.

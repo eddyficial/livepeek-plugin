@@ -50,7 +50,7 @@ window.
 From inside your project, in Claude Code:
 
 ```
-/livepeek:peek
+/livepeek:livepeek
 ```
 
 That's it. livepeek will:
@@ -82,18 +82,18 @@ building: a phone frame around it would misrepresent it.
 
 ## Opening it without Claude
 
-You do not have to be in a Claude session. A one-word `peek` command works
+You do not have to be in a Claude session. A one-word `livepeek` command works
 from any shell once you copy a wrapper from the plugin's `bin/` folder onto
-your PATH: `bin/peek.cmd` for PowerShell, `bin/peek` for Bash and the shells
+your PATH: `bin/livepeek.cmd` for PowerShell, `bin/livepeek` for Bash and the shells
 inside tmux and Zellij. On Windows, dropping both into a folder that is already on your PATH covers
-every shell at once. After that, `peek` in a project folder opens the pane
-and `peek --quit` closes it. The README has the exact copy commands.
+every shell at once. After that, `livepeek` in a project folder opens the pane
+and `livepeek --quit` closes it. The README has the exact copy commands.
 
 ## In VS Code
 
-The VS Code terminal cannot be split from the outside, so `/livepeek:peek` there
+The VS Code terminal cannot be split from the outside, so `/livepeek:livepeek` there
 prints instructions instead of a pane. Follow them: split the terminal by
-hand (Ctrl+Shift+5, or Cmd+\ on a Mac) and run `peek --here` in the new
+hand (Ctrl+Shift+5, or Cmd+\ on a Mac) and run `livepeek --here` in the new
 half. To see the real picture instead of text, enable the setting
 `terminal.integrated.enableImages` and reload the window (Developer: Reload
 Window). A new terminal alone is not enough.
@@ -111,7 +111,7 @@ Once it's focused:
 | **click / scroll** | goes straight through to the page |
 | **`i`** | typing mode: your keystrokes go to the page. `esc` stops |
 | **`space`** | pick a device: start typing to filter (`iph`, `sam`, `pixel`) |
-| **`p`** | switch project: every folder you have peeked before, plus any dev server running. Pick a stopped one and livepeek starts it |
+| **`p`** | switch project: every folder you have previewed before, plus any dev server running. Pick a stopped one and livepeek starts it |
 | `shift`+`?` | show every key |
 | `[` `]` | previous / next device |
 | `o` | rotate |
@@ -149,7 +149,7 @@ Two things to know:
 
 ## If something looks wrong
 
-Start with `peek --doctor`. It checks Node, the browser, the driver, your
+Start with `livepeek --doctor`. It checks Node, the browser, the driver, your
 terminal and its graphics support, and tells you which renderer you will get
 and why.
 
@@ -174,7 +174,7 @@ set -g allow-passthrough on
 `tmux` and run Claude Code inside it, or run it in your current pane:
 
 ```
-/livepeek:peek --here
+/livepeek:livepeek --here
 ```
 
 **"The browser driver is not installed."** livepeek downloads nothing itself;
@@ -184,7 +184,7 @@ the driver is one npm package you install once. Either globally:
 npm add --global playwright-core@1.63.0
 ```
 
-or in the project (`npm add --save-dev playwright-core@1.63.0`). `peek --doctor` confirms
+or in the project (`npm add --save-dev playwright-core@1.63.0`). `livepeek --doctor` confirms
 it is found.
 
 **You see a "livepeek is ready" welcome page.** The folder has no framework it
@@ -192,8 +192,8 @@ recognises and no `index.html`, `.html` or `.md` yet. Start building, or name
 the thing you mean:
 
 ```
-/livepeek:peek --file docs/spec.md
-/livepeek:peek --url http://localhost:3000
+/livepeek:livepeek --file docs/spec.md
+/livepeek:livepeek --url http://localhost:3000
 ```
 
 **The page is blank.** Your dev server is up but serving nothing useful. Open
@@ -204,8 +204,8 @@ web-build dependencies; livepeek will tell you and offer to install them.
 pane or a smaller viewport:
 
 ```
-/livepeek:peek --size 0.5
-/livepeek:peek --preset laptop
+/livepeek:livepeek --size 0.5
+/livepeek:livepeek --preset laptop
 ```
 
 ## What it recognises automatically
@@ -225,17 +225,17 @@ to filter the list.
 ## Options
 
 ```
-/livepeek:peek --preset laptop            a different viewport
-/livepeek:peek --url http://localhost:1234     skip detection, point at a server
-/livepeek:peek --port 3000                non-default dev server port
-/livepeek:peek --size 0.4                 wider pane
-/livepeek:peek --horizontal               split below instead of beside
-/livepeek:peek --no-serve                 your server is already running
-/livepeek:peek --file docs/spec.md        show one file (markdown or html)
-/livepeek:peek --here                     run in this pane, don't split
-/livepeek:peek --new                      force a second pane instead of reusing
-/livepeek:peek --quit                     close the open pane cleanly
-/livepeek:peek --dry-run                  show what it would do, then stop
+/livepeek:livepeek --preset laptop            a different viewport
+/livepeek:livepeek --url http://localhost:1234     skip detection, point at a server
+/livepeek:livepeek --port 3000                non-default dev server port
+/livepeek:livepeek --size 0.4                 wider pane
+/livepeek:livepeek --horizontal               split below instead of beside
+/livepeek:livepeek --no-serve                 your server is already running
+/livepeek:livepeek --file docs/spec.md        show one file (markdown or html)
+/livepeek:livepeek --here                     run in this pane, don't split
+/livepeek:livepeek --new                      force a second pane instead of reusing
+/livepeek:livepeek --quit                     close the open pane cleanly
+/livepeek:livepeek --dry-run                  show what it would do, then stop
 ```
 
 ## When livepeek is the wrong tool
@@ -259,7 +259,7 @@ It drives a real browser, so it shows what a browser shows, and nothing else.
 ## Letting Claude check its own work
 
 Tell Claude "change the header to orange" and it can edit the file, then run
-`/livepeek:peek --snapshot` and look at the result before telling you it's done. The
+`/livepeek:livepeek --snapshot` and look at the result before telling you it's done. The
 plugin's skill already instructs it to. If you want to see what it saw, the
 PNG it wrote is the page at full size.
 

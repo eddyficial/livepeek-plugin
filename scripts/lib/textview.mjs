@@ -15,7 +15,7 @@ const ESC = '\x1b';
 /**
  * Runs in the page. Walks the visible DOM in document order and returns
  * blocks: { kind, parts: [{ text, id?, role? }] }. Clickable elements get a
- * data-peek-id so a click on their text can be sent back to the page.
+ * data-livepeek-id so a click on their text can be sent back to the page.
  */
 export const EXTRACT = `(() => {
   const BLOCK = new Set(['ADDRESS','ARTICLE','ASIDE','BLOCKQUOTE','DD','DETAILS','DIV','DL','DT','FIELDSET','FIGCAPTION','FIGURE','FOOTER','FORM','H1','H2','H3','H4','H5','H6','HEADER','HR','LI','MAIN','NAV','OL','P','PRE','SECTION','SUMMARY','TABLE','TR','UL','BR','TD','TH']);
@@ -31,8 +31,8 @@ export const EXTRACT = `(() => {
     cur.parts.push(id ? { text, id, role } : { text });
   };
   const idFor = (el) => {
-    let id = el.getAttribute('data-peek-id');
-    if (!id) { id = String(nextId++); el.setAttribute('data-peek-id', id); }
+    let id = el.getAttribute('data-livepeek-id');
+    if (!id) { id = String(nextId++); el.setAttribute('data-livepeek-id', id); }
     else nextId = Math.max(nextId, Number(id) + 1);
     return id;
   };

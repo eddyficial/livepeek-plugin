@@ -1,13 +1,13 @@
 // A static server for things that have no dev server: a folder of HTML, a
 // single page, a markdown document.
 //
-// Without this, peek only works on projects that ship their own server, which
+// Without this, livepeek only works on projects that ship their own server, which
 // leaves out exactly the quick things people want to look at while editing -
 // a mockup, a README, a one-file prototype. No dependencies, so the plugin
 // stays a plain checkout.
 //
 // Live reload is a one-line poller injected into every HTML response: it asks
-// /__peek/stamp for the newest mtime under the root and reloads when it
+// /__livepeek/stamp for the newest mtime under the root and reloads when it
 // changes. Crude, dependency-free, and exactly as fast as the screenshot loop.
 
 import fs from 'node:fs';
@@ -23,7 +23,7 @@ const TYPES = {
   '.woff': 'font/woff', '.woff2': 'font/woff2',
 };
 
-const RELOAD = `<script>(()=>{let s=null;setInterval(async()=>{try{const r=await fetch('/__peek/stamp',{cache:'no-store'});const t=await r.text();if(s!==null&&t!==s)location.reload();s=t}catch{}},500)})()</script>`;
+const RELOAD = `<script>(()=>{let s=null;setInterval(async()=>{try{const r=await fetch('/__livepeek/stamp',{cache:'no-store'});const t=await r.text();if(s!==null&&t!==s)location.reload();s=t}catch{}},500)})()</script>`;
 
 // The page polls the stamp twice a second, and a served folder can be large -
 // a document opened from the home folder serves the whole of it. So the walk
@@ -180,7 +180,7 @@ export function serveStatic({ root, file = null, port = 0 }) {
     if (url.pathname === '/favicon.ico' && !fs.existsSync(path.join(root, 'favicon.ico'))) {
       res.writeHead(204); return res.end();
     }
-    if (url.pathname === '/__peek/stamp') {
+    if (url.pathname === '/__livepeek/stamp') {
       res.writeHead(200, { 'content-type': 'text/plain', 'cache-control': 'no-store' });
       return res.end(stamp(root));
     }

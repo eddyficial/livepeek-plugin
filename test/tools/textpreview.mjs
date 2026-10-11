@@ -11,7 +11,9 @@ const { chromium } = require('../../scripts/node_modules/playwright-core');
 const target = process.argv[2];
 const width = Number(process.argv[3] || 60);
 const url = /^https?:/.test(target) ? target : pathToFileURL(path.resolve(target)).href;
-const exe = process.env.PEEK_BROWSER || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
+const exe = process.env.LIVEPEEK_BROWSER
+  || process.env.PEEK_BROWSER
+  || 'C:/Program Files/Google/Chrome/Application/chrome.exe';
 
 const b = await chromium.launch({ executablePath: exe });
 const p = await b.newPage();

@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * Check that this machine can run peek, and say what to fix if it can't.
+ * Check that this machine can run livepeek, and say what to fix if it can't.
  *
  *   node doctor.mjs
  *
- * One line per check: "ok", "warn" (peek runs, but something is degraded) or
- * "FAIL" (peek cannot run until it is fixed). Exits 1 only on a FAIL, so it
+ * One line per check: "ok", "warn" (livepeek runs, but something is degraded) or
+ * "FAIL" (livepeek cannot run until it is fixed). Exits 1 only on a FAIL, so it
  * is safe to use in a script.
  *
  * The browser list and the multiplexer detection are copied from tui.mjs and
@@ -13,12 +13,12 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import { createRequire } from 'node:module';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { probeTerminal, pickRenderer } from './lib/caps.mjs';
 import { locateDriver } from './lib/driver.mjs';
+import { STATE_DIR } from './lib/state.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -42,7 +42,9 @@ function checkNode() {
 // -------------------------------------------------------------- browser ----
 // Same list as findSystemBrowser in tui.mjs. Keep the two in step.
 function findSystemBrowser() {
-  const candidates = [];
+  const configured = process.env.LIVEPEEK_BROWSER
+    || process.env.PEEK_BROWSER;
+  const candidates = [configured].filter(Boolean);
 
   if (process.platform === 'win32') {
     const roots = [
@@ -108,11 +110,11 @@ function checkHost() {
   const host = detectHost();
   if (host) return report('ok', 'multiplexer', host);
   if ((process.env.TERM_PROGRAM || '').toLowerCase() === 'vscode') {
-    report('warn', 'multiplexer', 'VS Code terminal: split it by hand and run `peek --here` in the new half',
+    report('warn', 'multiplexer', 'VS Code terminal: split it by hand and run `livepeek --here` in the new half',
       'or run tmux inside it; for pictures enable terminal.integrated.enableImages');
   } else
   report('FAIL', 'multiplexer', 'none detected, so there is no pane to split',
-    'start tmux first (works everywhere), or run peek with --here to use this pane');
+    'start tmux first (works everywhere), or run livepeek with --here to use this pane');
 }
 
 // ------------------------------------------------------------- graphics ----
@@ -154,15 +156,15 @@ function checkNpm() {
 
 // ----------------------------------------------------------------- home ----
 function checkHome() {
-  const dir = path.join(os.homedir(), '.peek');
+  const dir = STATE_DIR;
   try {
     fs.mkdirSync(dir, { recursive: true });
     const probe = path.join(dir, `.doctor-${process.pid}`);
     fs.writeFileSync(probe, 'ok');
     fs.unlinkSync(probe);
-    report('ok', '~/.peek', `writable (${dir})`);
+    report('ok', '~/.livepeek', `writable (${dir})`);
   } catch (e) {
-    report('FAIL', '~/.peek', `cannot write to ${dir}: ${e.code || e.message}`,
+    report('FAIL', '~/.livepeek', `cannot write to ${dir}: ${e.code || e.message}`,
       'make that folder writable; livepeek keeps its pane state and project list there');
   }
 }

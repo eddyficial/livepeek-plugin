@@ -1,5 +1,5 @@
 /**
- * Browser tests: need a Chromium and playwright-core (PEEK_BROWSER may point at
+ * Browser tests: need a Chromium and playwright-core (LIVEPEEK_BROWSER may point at
  * the executable); otherwise they report "skip". The page URL comes from serve().
  */
 import fs from 'node:fs';
@@ -22,7 +22,9 @@ const REAL_ENV = safeEnv(Object.fromEntries(Object.entries(REAL_HOME).filter(([,
 
 function browserCandidates() {
   const cands = [];
-  if (process.env.PEEK_BROWSER) cands.push(process.env.PEEK_BROWSER);
+  const configured = process.env.LIVEPEEK_BROWSER
+    || process.env.PEEK_BROWSER;
+  if (configured) cands.push(configured);
   // same list as findSystemBrowser() in scripts/tui.mjs
   if (process.platform === 'win32') {
     for (const r of [process.env['ProgramFiles'], process.env['ProgramFiles(x86)'], process.env['LOCALAPPDATA']].filter(Boolean)) {
@@ -53,20 +55,22 @@ function findPlaywright() {
 
 await test('browser: title, live reload, screenshot', async () => {
   const exes = browserCandidates();
-  if (!exes.length) return { skip: 'no Chromium found; set PEEK_BROWSER' };
+  if (!exes.length) return { skip: 'no Chromium found; set LIVEPEEK_BROWSER' };
   const chromium = findPlaywright();
   if (!chromium) return { skip: 'playwright-core not resolvable' };
 
   const dir = tmpdir('browser');
   const file = path.join(dir, 'index.html');
-  const doc = (h) => `<!doctype html><title>Peek Test</title><body><h1>${h}</h1></body>`;
+  const doc = (h) => `<!doctype html><title>livepeek Test</title><body><h1>${h}</h1></body>`;
   fs.writeFileSync(file, doc('one'));
   const url = await serve(dir);
 
   // Try each candidate: a machine can have a Chrome that exists but will not
-  // start headless under automation. An explicit PEEK_BROWSER must work, though.
+  // start headless under automation. An explicit LIVEPEEK_BROWSER must work, though.
   let browser = null, lastErr = null;
-  for (const exe of process.env.PEEK_BROWSER ? exes.slice(0, 1) : exes) {
+  const configured = process.env.LIVEPEEK_BROWSER
+    || process.env.PEEK_BROWSER;
+  for (const exe of configured ? exes.slice(0, 1) : exes) {
     try {
       browser = await chromium.launch({
         headless: true, executablePath: exe, env: REAL_ENV, args: ['--no-sandbox', '--disable-dev-shm-usage'],
@@ -75,13 +79,13 @@ await test('browser: title, live reload, screenshot', async () => {
     } catch (e) { lastErr = e; }
   }
   if (!browser) {
-    if (process.env.PEEK_BROWSER) throw lastErr;
+    if (configured) throw lastErr;
     return { skip: 'no browser could be launched: ' + String(lastErr?.message || lastErr).split('\n')[0] };
   }
   try {
     const page = await (await browser.newContext({ viewport: { width: 800, height: 600 } })).newPage();
     await page.goto(url, { waitUntil: 'domcontentloaded' });
-    eq(await page.title(), 'Peek Test', 'title');
+    eq(await page.title(), 'livepeek Test', 'title');
     eq(await page.textContent('h1'), 'one', 'initial h1');
 
     // let the poller record its first stamp, then change the file
@@ -108,13 +112,15 @@ await test('browser: title, live reload, screenshot', async () => {
 
 await test('browser: textview EXTRACT finds blocks, links, buttons, inputs', async () => {
   const exes = browserCandidates();
-  if (!exes.length) return { skip: 'no Chromium found; set PEEK_BROWSER' };
+  if (!exes.length) return { skip: 'no Chromium found; set LIVEPEEK_BROWSER' };
   const chromium = findPlaywright();
   if (!chromium) return { skip: 'playwright-core not resolvable' };
   const { EXTRACT } = await lib('textview.mjs');
 
   let browser = null, lastErr = null;
-  for (const exe of process.env.PEEK_BROWSER ? exes.slice(0, 1) : exes) {
+  const configured = process.env.LIVEPEEK_BROWSER
+    || process.env.PEEK_BROWSER;
+  for (const exe of configured ? exes.slice(0, 1) : exes) {
     try {
       browser = await chromium.launch({
         headless: true, executablePath: exe, env: REAL_ENV, args: ['--no-sandbox', '--disable-dev-shm-usage'],
@@ -123,7 +129,7 @@ await test('browser: textview EXTRACT finds blocks, links, buttons, inputs', asy
     } catch (e) { lastErr = e; }
   }
   if (!browser) {
-    if (process.env.PEEK_BROWSER) throw lastErr;
+    if (configured) throw lastErr;
     return { skip: 'no browser could be launched: ' + String(lastErr?.message || lastErr).split('\n')[0] };
   }
   try {
@@ -136,7 +142,7 @@ await test('browser: textview EXTRACT finds blocks, links, buttons, inputs', asy
     assert(parts.some(p => p.role === 'link' && p.id), 'no link part with id');
     assert(parts.some(p => p.role === 'button'), 'no button part');
     assert(parts.some(p => p.role === 'input'), 'no input part');
-    assert(await page.evaluate(() => document.querySelector('[data-peek-id]') !== null), 'no data-peek-id in DOM');
+    assert(await page.evaluate(() => document.querySelector('[data-livepeek-id]') !== null), 'no data-livepeek-id in DOM');
   } finally {
     await browser.close().catch(() => {});
   }

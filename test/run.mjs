@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Test harness for peek. No dependencies, no TTY, no terminal multiplexer.
+ * Test harness for livepeek. No dependencies, no TTY, no terminal multiplexer.
  *
  *   node test/run.mjs
  *

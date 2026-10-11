@@ -65,7 +65,7 @@ const SERVE_CWD  = arg('--serve-cwd', process.cwd());
 const SERVE_PORT = parseInt(arg('--serve-port', '0'), 10);
 
 // Things with no dev server - a folder of HTML, a markdown document, a single
-// page - are served by peek itself. See lib/serve.mjs.
+// page - are served by livepeek itself. See lib/serve.mjs.
 const STATIC_DIR  = arg('--static', null);
 const STATIC_FILE = arg('--file', null);
 
@@ -156,13 +156,13 @@ function resolveChromium() {
  * user sees a one-line status rather than a stack trace, and a document
  * folder with no package.json works exactly like a Vite project does.
  */
-// peek downloads nothing at run time. The browser driver is one npm package,
+// livepeek downloads nothing at run time. The browser driver is one npm package,
 // installed once by the user; the message says exactly which command.
 export const DRIVER_HINT =
   'The browser driver is not installed. Install it once, then launch livepeek again:\n\n' +
   '  npm add --global playwright-core@1.63.0\n\n' +
   'Or per project:  npm add --save-dev playwright-core@1.63.0\n' +
-  '(peek --doctor checks for it.)';
+  '(livepeek --doctor checks for it.)';
 
 /**
  * A Chrome or Edge already on this machine, used as a fallback when
@@ -171,7 +171,9 @@ export const DRIVER_HINT =
  * state to be in). Headless, so no window appears either way.
  */
 function findSystemBrowser() {
-  const candidates = [];
+  const configured = process.env.LIVEPEEK_BROWSER
+    || process.env.PEEK_BROWSER;
+  const candidates = [configured].filter(Boolean);
 
   if (process.platform === 'win32') {
     const roots = [
@@ -504,7 +506,7 @@ async function applyControl(s) {
 /** Everything currently listening, probed in parallel so this stays snappy. */
 async function scanTargets() {
   // Saved projects come first: those are folders the user can always go back
-  // to. A running dev server nobody launched through peek is appended so it
+  // to. A running dev server nobody launched through livepeek is appended so it
   // is still reachable.
   const saved = projects.list();
   const found = await Promise.all(saved.map(async p => {
@@ -748,7 +750,7 @@ async function menuSelect(pos) {
     if (!t) return tick(true);
 
     if (t.static) {
-      // a folder or a document: peek serves it itself
+      // a folder or a document: livepeek serves it itself
       statusMsg = 'serving ' + path.basename(t.dir);
       drawFooter(lastLayout || layout());
       try {
@@ -875,7 +877,7 @@ let lastComposed = null;
  *  frame, so text is legible when an agent reads it back. */
 function writeSnapshot(file) {
   try {
-    fs.mkdirSync(path.dirname(file), { recursive: true });   // e.g. .peek/ on first use
+    fs.mkdirSync(path.dirname(file), { recursive: true });   // e.g. .livepeek/ on first use
     if (lastShot) fs.writeFileSync(file, lastShot);          // page screenshot, full res
     else if (lastComposed) fs.writeFileSync(file, encodePng(lastComposed));
   } catch { /* a snapshot is never worth crashing the view */ }
@@ -1024,7 +1026,7 @@ async function handleMouse(code, col, row, press) {
     lastTextClick = { at: nowT, col, row };
     try {
       await page.evaluate((id) => {
-        const el = document.querySelector('[data-peek-id="' + id + '"]');
+        const el = document.querySelector('[data-livepeek-id="' + id + '"]');
         if (!el) return;
         el.scrollIntoView({ block: 'center' });
         if (el.matches('input,textarea,select')) { el.focus(); if (el.type === 'checkbox' || el.type === 'radio') el.click(); }
@@ -1110,7 +1112,7 @@ async function copyFrame() {
   if (!lastShot) return;
   // A private folder rather than a fixed name in the shared temp dir, which
   // another user or process could have planted something at.
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'peek-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'livepeek-'));
   const tmp = path.join(dir, 'clip.png');
   fs.writeFileSync(tmp, lastShot);
   const { spawnSync } = await import('node:child_process');

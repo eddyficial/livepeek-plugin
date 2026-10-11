@@ -36,6 +36,17 @@ await test('kitty.toKitty starts with the delete sequence', async () => {
   assert(s.startsWith(`${ESC}_Ga=d,d=i,i=1${ESC}\\`), 'bad prefix: ' + JSON.stringify(s.slice(0, 24)));
 });
 
+await test('state migrates the legacy directory under the temp HOME', async () => {
+  const legacy = path.join(HOME, '.peek');
+  const current = path.join(HOME, '.livepeek');
+  fs.mkdirSync(legacy);
+  fs.writeFileSync(path.join(legacy, 'legacy-marker'), 'migrated');
+  const { STATE_DIR } = await lib('state.mjs');
+  eq(STATE_DIR, current, 'state directory');
+  assert(fs.existsSync(path.join(current, 'legacy-marker')), 'legacy state was not migrated');
+  assert(!fs.existsSync(legacy), 'legacy state directory still exists');
+});
+
 await test('projects remember()/list() round-trip in a temp HOME', async () => {
   const projects = await lib('projects.mjs');
   const a = tmpdir('proj-a'), b = tmpdir('proj-b');
@@ -48,18 +59,18 @@ await test('projects remember()/list() round-trip in a temp HOME', async () => {
   l = projects.list();
   eq(l.map(p => p.name), ['a', 'b'], 're-remembering moves to top without duplicating');
   eq(l[0].kind, 'document', 'updated entry wins');
-  assert(fs.existsSync(path.join(HOME, '.peek', 'projects.json')), 'file not written under temp HOME');
+  assert(fs.existsSync(path.join(HOME, '.livepeek', 'projects.json')), 'file not written under temp HOME');
 });
 
 await test('serveStatic serves index.html with live-reload script', async () => {
   const dir = tmpdir('serve-html');
-  fs.writeFileSync(path.join(dir, 'index.html'), '<!doctype html><title>Hello Peek</title><body><h1>hi</h1></body>');
+  fs.writeFileSync(path.join(dir, 'index.html'), '<!doctype html><title>Hello livepeek</title><body><h1>hi</h1></body>');
   const url = await serve(dir);
   const res = await httpGetRaw(url, '/');
   eq(res.status, 200, 'status');
   const text = res.body;
   assert(text.includes('<h1>hi</h1>'), 'index.html content missing');
-  assert(text.includes('/__peek/stamp'), 'live-reload script missing');
+  assert(text.includes('/__livepeek/stamp'), 'live-reload script missing');
 });
 
 await test('serveStatic renders README.md with an h1 and live reload', async () => {
@@ -68,7 +79,7 @@ await test('serveStatic renders README.md with an h1 and live reload', async () 
   const url = await serve(dir, { file: 'README.md' });
   const text = (await httpGetRaw(url, '/')).body;
   assert(/<h1[^>]*>\s*Big Title\s*<\/h1>/.test(text), 'no rendered h1: ' + text.slice(0, 300));
-  assert(text.includes('/__peek/stamp'), 'live-reload script missing');
+  assert(text.includes('/__livepeek/stamp'), 'live-reload script missing');
 });
 
 await test('serveStatic refuses path traversal, including sibling dirs sharing the root prefix', async () => {

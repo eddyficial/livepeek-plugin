@@ -10,28 +10,27 @@
 // not share anything else.
 
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
+import { STATE_DIR } from './state.mjs';
 
-const DIR = path.join(os.homedir(), '.peek');
-export const FILE = path.join(DIR, 'session.json');
+export const FILE = path.join(STATE_DIR, 'session.json');
 
 // The pane touches this file every couple of seconds while it runs. A pid on
 // its own is not proof of life: once a pane is closed with the X, Windows
 // hands its pid to some unrelated process soon after, and process.kill(pid, 0)
 // then reports a pane that is long gone as alive.
-export const BEAT = path.join(DIR, 'alive');
+export const BEAT = path.join(STATE_DIR, 'alive');
 
 // A launcher takes this lock before it splits. Reading the session file and
 // then writing a claim is two steps, and two launchers started in the same
 // instant both pass the read; an exclusive create is one step and only one
 // of them wins it. The pane deletes the lock when it publishes.
-export const LOCK = path.join(DIR, 'claim.lock');
+export const LOCK = path.join(STATE_DIR, 'claim.lock');
 const LOCK_TTL = 20000;
 
 /** Try to become the launcher that splits. False means someone else is. */
 export function claim() {
-  fs.mkdirSync(DIR, { recursive: true });
+  fs.mkdirSync(STATE_DIR, { recursive: true });
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       fs.writeFileSync(LOCK, String(process.pid), { flag: 'wx' });
@@ -63,7 +62,7 @@ export function read() {
  */
 export function write(state) {
   try {
-    fs.mkdirSync(DIR, { recursive: true });
+    fs.mkdirSync(STATE_DIR, { recursive: true });
     if (state.pid) release();      // a real pane is up; the launch claim is over
     const data = JSON.stringify(state, null, 1);
     const tmp = FILE + '.' + process.pid + '.tmp';

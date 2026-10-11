@@ -18,7 +18,7 @@ No browser window. No emulator. Nothing to alt-tab to.
 ![livepeek showing a landing page at desktop, laptop and phone sizes, then a markdown spec, then a live edit landing](docs/demo.gif)
 
 ```
-/livepeek:peek
+/livepeek:livepeek
 ```
 
 That's the whole interface. It works out what your project is, starts the dev
@@ -44,15 +44,15 @@ Four things need to be on the machine. livepeek itself downloads nothing, ever.
   npm add --global playwright-core@1.63.0
   ```
 
-  livepeek finds it from the global install, from the project's own `node_modules`, or from a full `playwright` install. `peek --doctor` tells you if it is missing.
+  livepeek finds it from the global install, from the project's own `node_modules`, or from a full `playwright` install. `livepeek --doctor` tells you if it is missing. Set `LIVEPEEK_BROWSER` to an explicit browser executable when needed; the legacy `PEEK_BROWSER` name remains a compatibility fallback.
 
 If you point livepeek at a Vite, Next or Expo project, that project's dependencies must already be in place.
 
 ## Install
 
 ```
-/plugin marketplace add eddyficial/peek
-/plugin install livepeek@peek
+/plugin marketplace add eddyficial/livepeek
+/plugin install livepeek@livepeek
 ```
 
 Nothing to add to your project. livepeek drives the Chrome or Edge already on
@@ -62,33 +62,33 @@ downloaded Chromium, that is used instead.
 
 ## Open it from any shell
 
-`/livepeek:peek` inside Claude Code is one way in. The other is a plain `peek` command
+`/livepeek:livepeek` inside Claude Code is one way in. The other is a plain `livepeek` command
 in whatever shell you are in, no Claude session needed. Two tiny wrappers in
 [`bin/`](bin/) find the newest installed copy of the plugin, so they never go
 stale after an update:
 
-- `bin/peek` for Bash, Zsh and the shell inside tmux or Zellij
-- `bin/peek.cmd` for PowerShell and cmd on Windows
+- `bin/livepeek` for Bash, Zsh and the shell inside tmux or Zellij
+- `bin/livepeek.cmd` for PowerShell and cmd on Windows
 
 Copy whichever you need into any folder that is already on your PATH:
 
 ```
-copy bin\peek.cmd <that folder>
-copy bin\peek     <that folder>
+copy bin\livepeek.cmd <that folder>
+copy bin\livepeek     <that folder>
 ```
 
 On macOS and Linux, `/usr/local/bin` or `~/.local/bin`:
 
 ```
-cp bin/peek ~/.local/bin/peek && chmod +x ~/.local/bin/peek
+cp bin/livepeek ~/.local/bin/livepeek && chmod +x ~/.local/bin/livepeek
 ```
 
 Then, from any project folder:
 
 ```
-peek              open the pane here, or switch the open one to this folder
-peek --quit       close it
-peek --file x.md  show one file
+livepeek              open the pane here, or switch the open one to this folder
+livepeek --quit       close it
+livepeek --file x.md  show one file
 ```
 
 Every option in [Options](#options) works the same way.
@@ -152,7 +152,7 @@ always captures the real page at full resolution whatever the terminal shows.
 
 The automated test suite (image encoders, static server, markdown and text
 renderers, launcher detection, a headless browser round trip) runs on Windows
-and Ubuntu in GitHub Actions on every push. `peek --doctor` tells you which
+and Ubuntu in GitHub Actions on every push. `livepeek --doctor` tells you which
 row you are in before you open a pane.
 
 ## Terminals
@@ -177,7 +177,7 @@ Under tmux, graphics need passthrough enabled:
 set -g allow-passthrough on
 ```
 
-**VS Code's terminal works, with one manual step.** Nothing outside VS Code can split its terminal, so: split it yourself (the split icon, or Ctrl+Shift+5 / Cmd+\ on a Mac), and in the new half run `peek --here`. Live reload, clicks and keys all work. For pictures rather than text, turn on the setting `terminal.integrated.enableImages` and reload the window (Developer: Reload Window); a new terminal alone is not enough. Tested on VS Code 1.140: both sixel and kitty graphics render there. Running `tmux` inside the VS Code terminal also works, and then `/livepeek:peek` splits for you.
+**VS Code's terminal works, with one manual step.** Nothing outside VS Code can split its terminal, so: split it yourself (the split icon, or Ctrl+Shift+5 / Cmd+\ on a Mac), and in the new half run `livepeek --here`. Live reload, clicks and keys all work. For pictures rather than text, turn on the setting `terminal.integrated.enableImages` and reload the window (Developer: Reload Window); a new terminal alone is not enough. Tested on VS Code 1.140: both sixel and kitty graphics render there. Running `tmux` inside the VS Code terminal also works, and then `/livepeek:livepeek` splits for you.
 
 **No graphics? You get the page as text.** Some hosts cannot draw images at all (Zellij on Windows is one; it passes the terminal's sixel reply through but renders nothing). There livepeek lays the page out as text instead: headings, paragraphs, lists, links and buttons, wrapped to the pane. Scrolling scrolls, clicking a link or button clicks it, `i` types into a focused field. It is a reader, not a picture, so layout and colour are gone, but every word is legible. `b` cycles kitty, sixel, text and half-blocks if the automatic choice is wrong. For a sharp picture on Windows, run livepeek from a Windows Terminal pane directly.
 
@@ -194,7 +194,7 @@ Focus the pane first: `alt`+arrow in most terminals, `prefix`+arrow in tmux.
 | click / scroll | goes through to the page |
 | `i` | **typing mode**: send keystrokes to the page |
 | `space` | **pick a device**; start typing to filter: `iph`, `sam`, `pixel`, `desk` |
-| `p` | **switch project**: every folder you have peeked before, plus any dev server running |
+| `p` | **switch project**: every folder you have previewed before, plus any dev server running |
 | `shift`+`?` | help overlay with every key |
 | `[` `]` | previous / next device |
 | `o` | rotate |
@@ -245,21 +245,21 @@ analogue-feeling input will be approximate.
 ## Options
 
 ```
-/livepeek:peek --preset laptop          a different viewport
-/livepeek:peek --url http://localhost:1234   skip detection, point at a server
-/livepeek:peek --port 3000              non-default dev server port
-/livepeek:peek --size 0.4               wider pane
-/livepeek:peek --horizontal             split below instead of beside
-/livepeek:peek --no-serve               a server is already running
-/livepeek:peek --file docs/spec.md      show one file (markdown or html)
-/livepeek:peek --snapshot out.png       write what the pane shows to a PNG
-/livepeek:peek --eval 'innerWidth'      run a snippet in the shown page
-/livepeek:peek --here                   run in this pane, don't split
-/livepeek:peek --new                    force a second pane instead of reusing
-/livepeek:peek --quit                   close the open pane cleanly
-/livepeek:peek --compare desktop,iphone-15-pro   two panes side by side, one per preset (q closes each)
-/livepeek:peek --doctor                 check Node, browser, driver, terminal and graphics, say what will work
-/livepeek:peek --dry-run                print what it would do and stop
+/livepeek:livepeek --preset laptop          a different viewport
+/livepeek:livepeek --url http://localhost:1234   skip detection, point at a server
+/livepeek:livepeek --port 3000              non-default dev server port
+/livepeek:livepeek --size 0.4               wider pane
+/livepeek:livepeek --horizontal             split below instead of beside
+/livepeek:livepeek --no-serve               a server is already running
+/livepeek:livepeek --file docs/spec.md      show one file (markdown or html)
+/livepeek:livepeek --snapshot out.png       write what the pane shows to a PNG
+/livepeek:livepeek --eval 'innerWidth'      run a snippet in the shown page
+/livepeek:livepeek --here                   run in this pane, don't split
+/livepeek:livepeek --new                    force a second pane instead of reusing
+/livepeek:livepeek --quit                   close the open pane cleanly
+/livepeek:livepeek --compare desktop,iphone-15-pro   two panes side by side, one per preset (q closes each)
+/livepeek:livepeek --doctor                 check Node, browser, driver, terminal and graphics, say what will work
+/livepeek:livepeek --dry-run                print what it would do and stop
 ```
 
 ## Claude can see it
@@ -286,16 +286,16 @@ It drives a real browser, so it shows what a browser shows, and only that.
 
 ## When something is wrong
 
-`peek --doctor` (or `/livepeek:peek --doctor`) checks everything livepeek needs and says which renderer your terminal will get. Run it first if the pane looks like coloured noise or never opens.
+`livepeek --doctor` (or `/livepeek:livepeek --doctor`) checks everything livepeek needs and says which renderer your terminal will get. Run it first if the pane looks like coloured noise or never opens.
 
 The pane also tells you when the page is unwell: a red `2 errors` in the footer means the page threw or logged `console.error` (press `e` to read them), and `page not responding` means the browser stopped answering, which usually means a tight loop in your code.
 
 ## Status line
 
-`~/.peek/session.json` is plain JSON that any status line or prompt can read: `target` (what is shown), `preset`, `errors` (count on the current page) and `pid`. A one-liner for a shell prompt:
+`~/.livepeek/session.json` is plain JSON that any status line or prompt can read: `target` (what is shown), `preset`, `errors` (count on the current page) and `pid`. A one-liner for a shell prompt:
 
 ```
-node -e "try{const s=require(require('os').homedir()+'/.peek/session.json');process.stdout.write('peek '+s.preset+(s.errors?' !'+s.errors:''))}catch{}"
+node -e "try{const s=require(require('os').homedir()+'/.livepeek/session.json');process.stdout.write('livepeek '+s.preset+(s.errors?' !'+s.errors:''))}catch{}"
 ```
 
 ## Tests
@@ -310,9 +310,9 @@ Everything livepeek does, so you can check it before installing:
 - **Downloads nothing.** The browser driver (`playwright-core`, pinned to 1.63.0) is something you install once with npm; livepeek only looks for it and tells you the command if it is missing.
 - **Serves your files on localhost.** For a plain folder, `.html` or `.md` file it starts a small web server on a random local port. It does not listen on other network interfaces.
 - **Starts your dev server, only if you ask.** Opening a Vite, Next, Expo or similar project runs that project's own `npm run` script, and picking a stopped project in the `p` list does the same.
-- **Writes a little local state** to `~/.peek/`: which pane is open, and the folders you have previewed (`projects.json`). Delete the folder to clear it.
+- **Writes a little local state** to `~/.livepeek/`: which pane is open, and the folders you have previewed (`projects.json`). On first use, an existing `~/.peek/` is migrated when the new directory does not yet exist. Delete the folder to clear it.
 - **Sends nothing anywhere.** No telemetry, no analytics, no account, no outbound requests of its own. The pages you preview make whatever requests they normally would.
-- **Has no hooks and no MCP server.** It adds one skill and one optional `peek` shell command.
+- **Has no hooks and no MCP server.** It adds one skill and one optional `livepeek` shell command.
 - **Clipboard, only when you press `c`.** Copying a frame uses PowerShell on Windows, `osascript` on macOS, and `wl-copy` or `xclip` on Linux. Nothing is read from the clipboard.
 
 ## How it works
