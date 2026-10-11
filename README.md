@@ -71,10 +71,10 @@ top-level `bin/` is on its PATH.
 
 For PowerShell, cmd, or shells outside Claude Code, copy a wrapper from the
 installed plugin cache into a folder on your PATH. With the default Claude
-configuration, the v0.7.3 wrappers are here:
+configuration, the v0.7.4 wrappers are here:
 
 ```
-~/.claude/plugins/cache/livepeek/livepeek/0.7.3/bin/
+~/.claude/plugins/cache/livepeek/livepeek/0.7.4/bin/
 ```
 
 These examples use `$HOME\bin` on Windows and `~/.local/bin` on macOS and
@@ -84,14 +84,14 @@ Windows PowerShell:
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\bin" | Out-Null
-Copy-Item "$HOME\.claude\plugins\cache\livepeek\livepeek\0.7.3\bin\livepeek.cmd" "$HOME\bin\livepeek.cmd"
+Copy-Item "$HOME\.claude\plugins\cache\livepeek\livepeek\0.7.4\bin\livepeek.cmd" "$HOME\bin\livepeek.cmd"
 ```
 
 macOS or Linux:
 
 ```bash
 mkdir -p ~/.local/bin
-cp ~/.claude/plugins/cache/livepeek/livepeek/0.7.3/bin/livepeek ~/.local/bin/livepeek
+cp ~/.claude/plugins/cache/livepeek/livepeek/0.7.4/bin/livepeek ~/.local/bin/livepeek
 chmod +x ~/.local/bin/livepeek
 ```
 
