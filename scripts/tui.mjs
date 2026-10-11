@@ -70,6 +70,12 @@ const SERVE_PORT = parseInt(arg('--serve-port', '0'), 10);
 // page - are served by livepeek itself. See lib/serve.mjs.
 const STATIC_DIR  = arg('--static', null);
 const STATIC_FILE = arg('--file', null);
+// the launcher says which terminal pane this view belongs to (lib/session.mjs)
+const SLOT_ARG = arg('--slot', null);
+if (SLOT_ARG) {
+  if (!session.validSlot(SLOT_ARG)) { console.error('livepeek: bad --slot ' + SLOT_ARG); process.exit(1); }
+  session.useSlot(SLOT_ARG);
+}
 
 // Write the frame being shown to this PNG on every repaint, so an agent can
 // look at the pane. Also requestable after the fact via the session file.
@@ -2006,8 +2012,8 @@ async function main() {
 
 /**
  * Stop advertising this pane - but only if the session file is still ours.
- * With --compare two panes run at once and the newer one owns the file;
- * quitting the older one must not make the newer one look closed.
+ * A pane that was replaced in its slot (it stopped answering and a new one
+ * took over) must not make its successor look closed.
  */
 function releaseSession() {
   // a launcher's claim (no pid yet) is cleared too: it was for this pane, and

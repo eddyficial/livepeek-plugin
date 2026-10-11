@@ -26,7 +26,10 @@ server if it isn't running, detects your terminal, and splits it.
 
 Run it again from a different project and the **same pane** switches to it,
 website, game, phone app. One pane that follows what you're working on, not a
-new one each time. Press `p` inside the pane to switch without leaving it.
+new one each time. Each terminal gets its own: a second Claude session in
+another tab opens a pane of its own instead of taking over yours. (Hosts that
+give no pane id, such as the VS Code terminal, share one unless you set
+`LIVEPEEK_SLOT`.) Press `p` inside the pane to switch without leaving it.
 
 **New here?** [GETTING-STARTED.md](GETTING-STARTED.md) walks through the first
 run and the handful of things that can go wrong.
@@ -68,10 +71,10 @@ top-level `bin/` is on its PATH.
 
 For PowerShell, cmd, or shells outside Claude Code, copy a wrapper from the
 installed plugin cache into a folder on your PATH. With the default Claude
-configuration, the v0.6.0 wrappers are here:
+configuration, the v0.6.1 wrappers are here:
 
 ```
-~/.claude/plugins/cache/livepeek/livepeek/0.6.0/bin/
+~/.claude/plugins/cache/livepeek/livepeek/0.6.1/bin/
 ```
 
 These examples use `$HOME\bin` on Windows and `~/.local/bin` on macOS and
@@ -81,14 +84,14 @@ Windows PowerShell:
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\bin" | Out-Null
-Copy-Item "$HOME\.claude\plugins\cache\livepeek\livepeek\0.6.0\bin\livepeek.cmd" "$HOME\bin\livepeek.cmd"
+Copy-Item "$HOME\.claude\plugins\cache\livepeek\livepeek\0.6.1\bin\livepeek.cmd" "$HOME\bin\livepeek.cmd"
 ```
 
 macOS or Linux:
 
 ```bash
 mkdir -p ~/.local/bin
-cp ~/.claude/plugins/cache/livepeek/livepeek/0.6.0/bin/livepeek ~/.local/bin/livepeek
+cp ~/.claude/plugins/cache/livepeek/livepeek/0.6.1/bin/livepeek ~/.local/bin/livepeek
 chmod +x ~/.local/bin/livepeek
 ```
 
@@ -207,9 +210,16 @@ In Windows Terminal the pane is split into the window you used most recently
 (`wt -w 0`). With several Windows Terminal windows open, run livepeek from the
 one you want it in, or click into that window first.
 
-One pane follows you between terminals too. If you open livepeek in Windows
-Terminal, then move into Zellij and run it again, the old pane is closed and a
-fresh one opens where you are now.
+Each pane belongs to the terminal pane it was launched from (the tab your
+Claude session runs in), so two sessions in two tabs each get their own view.
+`--snapshot`, `--eval`, `--quit` and `--status` act on that terminal's pane,
+or on the only pane open if it has none, such as a `--here` view in a split you
+made by hand. tmux, Zellij, Kitty, WezTerm and Windows Terminal give each pane
+an id; elsewhere (the VS Code terminal, a plain console) every session shares
+one pane. `LIVEPEEK_SLOT` overrides this: give two shells different values to
+keep them apart, or the same value to share. An extra pane from `--new` or
+`--compare` has a slot of its own: control commands reach it only once it is
+the only pane left, so close it with `q`.
 
 ## Keys
 
@@ -292,7 +302,8 @@ analogue-feeling input will be approximate.
 /livepeek:livepeek --here                   run in this pane, don't split
 /livepeek:livepeek --new                    force a second pane instead of reusing
 /livepeek:livepeek --quit                   close the open pane cleanly
-/livepeek:livepeek --compare desktop,iphone-15-pro   two panes side by side, one per preset (q closes each)
+/livepeek:livepeek --compare desktop,iphone-15-pro   two panes side by side, one per preset (--quit closes the first; q closes either)
+/livepeek:livepeek --status                 what this terminal's pane shows, as JSON
 /livepeek:livepeek --doctor                 check Node, browser, driver, terminal and graphics, say what will work
 /livepeek:livepeek --dry-run                print what it would do and stop
 ```
@@ -327,10 +338,10 @@ The pane also tells you when the page is unwell: a red `2 errors` in the footer 
 
 ## Status line
 
-`~/.livepeek/session.json` is plain JSON that any status line or prompt can read: `target` (what is shown), `preset`, `errors` (count on the current page) and `pid`. A one-liner for a shell prompt:
+`livepeek --status` prints one line of JSON about this terminal's pane that any status line or prompt can read: `target` (what is shown), `preset`, `errors` (count on the current page), `host` and `pid`. It exits non-zero when no pane is open. A one-liner for a shell prompt:
 
 ```
-node -e "try{const s=require(require('os').homedir()+'/.livepeek/session.json');process.stdout.write('livepeek '+s.preset+(s.errors?' !'+s.errors:''))}catch{}"
+node -e "try{const s=JSON.parse(require('child_process').execSync('livepeek --status',{stdio:['ignore','pipe','ignore']}));process.stdout.write('livepeek '+s.preset+(s.errors?' !'+s.errors:''))}catch{}"
 ```
 
 ## Tests
@@ -345,7 +356,7 @@ Everything livepeek does, so you can check it before installing. It collects and
 - **Downloads nothing.** The browser driver (`playwright-core`, pinned to 1.63.0) is something you install once with npm; livepeek only looks for it and tells you the command if it is missing.
 - **Serves your files on localhost.** For a plain folder, `.html` or `.md` file it starts a small web server on a random local port. It does not listen on other network interfaces.
 - **Starts your dev server, only if you ask.** Opening a Vite, Next, Expo or similar project runs that project's own `npm run` script, and picking a stopped project in the `p` list does the same.
-- **Writes a little local state** to `~/.livepeek/`: which pane is open, the folders you have previewed (`projects.json`), and whether the first-run welcome card still needs showing (`intro.json`). On first use, an existing `~/.peek/` is migrated when the new directory does not yet exist. Delete the folder to clear it.
+- **Writes a little local state** to `~/.livepeek/`: which panes are open (`panes/`, one small file per terminal), the folders you have previewed (`projects.json`), and whether the first-run welcome card still needs showing (`intro.json`). On first use, an existing `~/.peek/` is migrated when the new directory does not yet exist. Delete the folder to clear it.
 - **Sends nothing anywhere.** No telemetry, no analytics, no account, no outbound requests of its own. The pages you preview make whatever requests they normally would.
 - **Has no hooks and no MCP server.** It adds one skill and one optional `livepeek` shell command.
 - **Clipboard, only when you press `c`.** Copying a frame uses PowerShell on Windows, `osascript` on macOS, and `wl-copy` or `xclip` on Linux. Nothing is read from the clipboard.
@@ -374,7 +385,7 @@ scripts/
   lib/bare.mjs    frameless compositing, for web, games and documents
   lib/serve.mjs   built-in static server, markdown renderer, live reload
   lib/pngenc.mjs  PNG encoder for snapshots
-  lib/session.mjs one shared pane: reuse, retarget, snapshot, eval
+  lib/session.mjs one pane per terminal: reuse, retarget, snapshot, eval
   lib/projects.mjs folders previewed before, for the `p` picker
   lib/state.mjs   the ~/.livepeek directory (and one-time ~/.peek migration)
   lib/textview.mjs text renderer for hosts that cannot draw images

@@ -39,6 +39,28 @@ if (flag('--doctor')) {
   process.exit(r.status ?? 1);
 }
 
+// --status: what this terminal's pane is showing, as one line of JSON, for a
+// status line or for Claude to read the page's error count. Read-only, so it
+// runs before any project detection.
+if (flag('--status')) {
+  const r = session.resolve();
+  if (!r.pane) {
+    console.error(noPaneMessage(r.error));
+    process.exit(1);
+  }
+  const p = r.pane;
+  console.log(JSON.stringify({ slot: session.SLOT, target: p.target, static: p.static || null, file: p.file || null,
+    preset: p.preset, errors: p.errors || 0, host: p.host, pid: p.pid }));
+  process.exit(0);
+}
+
+/** Why a control command found no pane to talk to. */
+function noPaneMessage(why) {
+  if (why === 'several') return 'several livepeek panes are open, none of them opened from this terminal. Run this from the terminal that opened the one you mean.';
+  if (why === 'starting') return 'the livepeek pane for this terminal is still starting; try again in a moment.';
+  return 'no livepeek pane is open.';
+}
+
 const URL_ARG  = arg('--url', null);
 const PRESET_ARG = arg('--preset', arg('--device', null));   // --device kept as an alias
 
@@ -172,6 +194,9 @@ const SNAPSHOT = arg('--snapshot', null);
 // a document lives where it lives, not at whatever package.json is above it
 const paneCwd = STATIC ? STATIC.dir : root;
 
+// an extra pane gets a slot of its own rather than sharing this terminal's
+if (flag('--new')) session.useSlot(session.extraSlot());
+
 const previewCmd = [
   process.execPath,
   path.join(__dirname, 'tui.mjs'),
@@ -179,6 +204,7 @@ const previewCmd = [
   '--preset', PRESET,
   '--interval', String(INTERVAL),
   '--host', detectHost() || 'none',
+  '--slot', session.SLOT,
   ...(arg('--render', null) ? ['--render', arg('--render', null)] : []),
   ...(welcome ? ['--watch-dir', process.cwd()] : []),
   ...serveArgs,
@@ -198,18 +224,8 @@ const shellQuote = (parts) => parts.map(p => "'" + String(p).replace(/'/g, "'\\'
  * innermost owns the pane the user is looking at, so it has to win.
  */
 function detectHost() {
-  // A VS Code terminal inherits the environment VS Code was launched from,
-  // so ZELLIJ or WT_SESSION may be set while no such pane is anywhere near
-  // this terminal. TERM_PROGRAM is set by the innermost program: VS Code
-  // says vscode, and tmux overrides it with tmux when it is really inside.
-  const vscode = (process.env.TERM_PROGRAM || '').toLowerCase() === 'vscode';
-  if (process.env.TMUX && !vscode) return 'tmux';
-  if (vscode) return null;
-  if (process.env.ZELLIJ) return 'zellij';
-  if (process.env.KITTY_LISTEN_ON) return 'kitty';
-  if (process.env.WEZTERM_PANE) return 'wezterm';
-  if (process.env.WT_SESSION) return 'wt';
-  return null;
+  // shared with the pane slot logic, so the slot always follows the same host
+  return session.detectHost();
 }
 
 // wt.exe is an app-execution alias in %LOCALAPPDATA%\Microsoft\WindowsApps.
@@ -274,12 +290,17 @@ const splitters = {
 async function main() {
   let open = session.current();
   let weHoldClaim = false;
+  // Control commands may reach a pane this terminal did not open, if it is
+  // the only one (a --here view in a split the user made by hand).
+  const control = flag('--quit') || arg('--eval', null) || (SNAPSHOT && argv.length <= 2);
+  let why = null;
+  if (control && !open) { const r = session.resolve(); open = r.pane || null; why = r.error; }
 
   // --quit closes the pane cleanly from outside. Killing the process instead
   // makes it exit non-zero, and Windows Terminal keeps a pane open on an
   // abnormal exit - which is how you end up with a row of dead panes.
   if (flag('--quit')) {
-    if (!open) return console.log('no livepeek pane is open.');
+    if (!open) return console.log(noPaneMessage(why));
     session.write({ ...open, quit: true, rev: (open.rev || 0) + 1 });
     return console.log('asked the open pane to close.');
   }
@@ -288,7 +309,7 @@ async function main() {
   // the JSON result. Pairs with --snapshot: look, then read the exact state.
   const EVAL = arg('--eval', null);
   if (EVAL) {
-    if (!open) die('no livepeek pane is open.');
+    if (!open) die(noPaneMessage(why));
     session.write({ ...open, eval: EVAL, evalResult: null, rev: (open.rev || 0) + 1 });
     const deadline = Date.now() + 8000;
     while (Date.now() < deadline) {
@@ -302,7 +323,7 @@ async function main() {
   // --snapshot alone: ask the open pane to write what it is showing, and
   // wait for it. This is how an agent sees the pane.
   if (SNAPSHOT && !open && argv.length <= 2) {
-    die('no livepeek pane is open to snapshot. Run livepeek first, then --snapshot.');
+    die(why === 'none' || !why ? 'no livepeek pane is open to snapshot. Run livepeek first, then --snapshot.' : noPaneMessage(why));
   }
   /** Wait for the open pane to report the snapshot asked for. */
   const awaitSnapshot = async (file) => {
@@ -367,6 +388,7 @@ async function main() {
     const what = STATIC ? `${STATIC.file || 'index.html'} in ${STATIC.dir}` : TARGET;
     console.log(`reusing the open pane: ${what} at ${PRESET}`);
     console.log('  (--new splits a second pane instead)');
+    openCompareSecond();
     // a retarget that also asked for a snapshot waits for it, the same as a
     // bare --snapshot does, so the caller can read the file straight away
     if (SNAPSHOT) return awaitSnapshot(path.resolve(SNAPSHOT));
@@ -432,6 +454,15 @@ async function main() {
     die(`Could not split the ${host} pane: ${r.error?.message || 'exit ' + r.status}`);
   }
 
+  openCompareSecond();
+
+  console.log(`\nlivepeek opened (${host}): ${TARGET} at ${PRESET}`);
+  console.log('  keys   space device  ·  p project  ·  shift+? help  ·  q quit  ·  mouse works');
+  console.log('  close  press q in the pane so the headless browser shuts down cleanly');
+}
+
+/** --compare a,b: this launch showed a; open an extra pane beside it for b. */
+function openCompareSecond() {
   const compare = arg('--compare', null);
   if (compare) {
     // "--compare desktop,iphone-15-pro": this pane got the first, open a
@@ -439,14 +470,12 @@ async function main() {
     const second = compare.split(',')[1];
     if (second) {
       const rest = argv.filter((a, i, all) => a !== '--compare' && all[i - 1] !== '--compare'
-        && a !== '--preset' && all[i - 1] !== '--preset' && a !== '--new');
+        && a !== '--preset' && all[i - 1] !== '--preset' && a !== '--new'
+        // the snapshot is the first pane's; two writers would race for one file
+        && a !== '--snapshot' && all[i - 1] !== '--snapshot');
       spawnSync(process.execPath, [path.join(__dirname, 'pane.mjs'), ...rest, '--new', '--preset', second], { stdio: 'inherit' });
     }
   }
-
-  console.log(`\nlivepeek opened (${host}): ${TARGET} at ${PRESET}`);
-  console.log('  keys   space device  ·  p project  ·  shift+? help  ·  q quit  ·  mouse works');
-  console.log('  close  press q in the pane so the headless browser shuts down cleanly');
 }
 
 main().catch(e => die(e.message || String(e)));

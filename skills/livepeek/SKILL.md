@@ -1,7 +1,7 @@
 ---
 name: livepeek
 description: Open a live view of whatever the user is building - a website, a game, a phone app, a document, a mockup - in a split terminal pane, and look at it yourself after making changes. Use when the user says "/livepeek:livepeek", "show me", "open the preview", "let me see it", "start the emulator", "view the site", "preview this file", or asks to watch what they are building while they edit. Also use after editing UI, game or document files to verify the change visually, and for "the preview is blank / looks wrong".
-version: 0.6.0
+version: 0.6.1
 ---
 
 # livepeek: a live viewing portal in the terminal
@@ -60,11 +60,12 @@ Options, added when the user asks:
 | `--horizontal` | split below instead of beside |
 | `--no-serve` | don't start a server, one is already running |
 | `--here` | run in the current pane instead of splitting |
-| `--new` | force a second pane instead of reusing the open one |
+| `--new` | force an extra pane instead of reusing the open one; control commands keep reaching this terminal's own pane while that is open |
 | `--quit` | close the open pane cleanly |
 | `--snapshot out.png` | write what the open pane is showing to a PNG |
 | `--eval '<js>'` | run a snippet in the shown page, print the JSON result |
-| `--compare a,b` | two panes side by side, one per preset (`desktop,iphone-15-pro`). `--quit` closes only the last one opened; the user presses `q` in the other |
+| `--compare a,b` | two panes side by side, one per preset (`desktop,iphone-15-pro`). `--quit` and `--snapshot` reach the first while it is open; the user presses `q` in the second |
+| `--status` | one line of JSON about this terminal's pane: `target`, `preset`, `errors`, `host`, `pid` |
 | `--doctor` | diagnose: Node, browser, driver, multiplexer, graphics. Run this first when the pane will not open or renders garbage |
 | `--dry-run` | print what it would do and exit |
 
@@ -95,13 +96,22 @@ livepeek --eval '[innerWidth, innerHeight]'
 Both need a pane to be open. If the user said "change X" and X is visible in
 the pane, the loop is: edit, wait ~2s, snapshot, look, report what you see.
 
-## One pane, reused
+## One pane per terminal, reused
 
-**If a pane is already open, this retargets it instead of splitting again** and
-prints `reusing the open pane`. That is correct and expected; launching from a
-website project and then from a phone project leaves one pane that switches
-between them. Do not treat it as a failure, and do not reach for `--new` unless
-the user actually asks for two views side by side.
+**If this terminal already opened a pane, this retargets it instead of
+splitting again** and prints `reusing the open pane`. That is correct and
+expected; launching from a website project and then from a phone project
+leaves one pane that switches between them. Do not treat it as a failure, and
+do not reach for `--new` unless the user actually asks for two views side by
+side.
+
+The pane belongs to the terminal pane it was launched from, so another Claude
+session in another tab gets its own livepeek pane and never takes over yours.
+In hosts with no pane id (the VS Code terminal, a plain console) sessions share
+one unless `LIVEPEEK_SLOT` differs.
+`--snapshot`, `--eval` and `--quit` talk to this terminal's pane, or to the
+only pane open if this terminal has none (a `--here` view in a split the user
+made by hand). With several open and none of them yours, they say so.
 
 The pane is also switchable from the inside with `p`, which lists every
 project livepeek has shown before plus any dev server currently running.
@@ -170,12 +180,13 @@ entire point of this plugin.
 
 ## Errors on the page
 
-The session file `~/.livepeek/session.json` carries `errors`, the number of
-uncaught exceptions and `console.error` calls on the current page since it
-loaded. After you change something, read it along with the snapshot:
+`livepeek --status` prints one line of JSON about this terminal's pane,
+including `errors`: the number of uncaught exceptions and `console.error`
+calls on the current page since it loaded. After you change something, read
+it along with the snapshot:
 
 ```bash
-node -e "console.log(JSON.parse(require('fs').readFileSync(require('os').homedir()+'/.livepeek/session.json')).errors)"
+livepeek --status
 ```
 
 A non-zero count means your change broke something even if the page still
