@@ -1,7 +1,7 @@
 ---
 name: livepeek
 description: Open a live view of whatever the user is building - a website, a game, a phone app, a document, a mockup - in a split terminal pane, and look at it yourself after making changes. Use when the user says "/livepeek:livepeek", "show me", "open the preview", "let me see it", "start the emulator", "view the site", "preview this file", or asks to watch what they are building while they edit. Also use after editing UI, game or document files to verify the change visually, and for "the preview is blank / looks wrong".
-version: 0.6.4
+version: 0.7.0
 ---
 
 # livepeek: a live viewing portal in the terminal
@@ -64,6 +64,7 @@ Options, added when the user asks:
 | `--quit` | close the open pane cleanly |
 | `--snapshot out.png` | write what the open pane is showing to a PNG |
 | `--eval '<js>'` | run a snippet in the shown page, print the JSON result |
+| `--picked` | the element the user last pointed at in the pane, as JSON |
 | `--compare a,b` | two panes side by side, one per preset (`desktop,iphone-15-pro`). `--quit` and `--snapshot` reach the first while it is open; the user presses `q` in the second |
 | `--status` | one line of JSON about this terminal's pane: `target`, `preset`, `errors`, `host`, `pid` |
 | `--doctor` | diagnose: Node, browser, driver, multiplexer, graphics. Run this first when the pane will not open or renders garbage |
@@ -95,6 +96,23 @@ livepeek --eval '[innerWidth, innerHeight]'
 
 Both need a pane to be open. If the user said "change X" and X is visible in
 the pane, the loop is: edit, wait ~2s, snapshot, look, report what you see.
+
+## When the user says "this"
+
+The user can point at things in the pane: `x`, then a click, picks an
+element instead of clicking it. When they say "make this bigger", "fix that
+button" or "what's this?" without naming it, read what they picked:
+
+```bash
+livepeek --picked
+```
+
+It prints the element's tag, visible text, a CSS selector that finds it, the
+React or Vue component that rendered it (dev builds only), its box on screen,
+the page URL and a snippet of its HTML. Search the project for the component
+name or the text to find the source. The pick also lands on the user's
+clipboard as one line starting `[livepeek pick]`; if they paste that into
+the chat, it is the same element.
 
 ## One pane per terminal, reused
 
@@ -235,6 +253,9 @@ Focus the pane first (`alt`+arrow in most terminals, `prefix`+arrow in tmux).
 | `+` `-` `0` | zoom in / out / reset (CSS zoom, viewport unchanged) |
 | `c` | copy the current frame to the system clipboard |
 | `w` | open the page in the system browser for a full-size look; clicking the underlined address in the header does the same |
+| `g` | go to a page: type a path (`/settings`) or an address (`localhost:3000`), enter goes |
+| `x` | point mode: hover outlines elements, a click picks one for Claude (`--picked`) and copies a reference; `esc` stops |
+| `m` | QR code that opens the page on a phone on the same Wi-Fi. If the dev server only listens on localhost it says how to fix that; for livepeek's own server, `s` shares it on the network until the pane quits |
 | `.` | pause refreshing |
 | `b` | cycle renderer: kitty, sixel, text, half-blocks |
 | `q` | quit and close the pane |

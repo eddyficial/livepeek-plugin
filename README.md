@@ -71,10 +71,10 @@ top-level `bin/` is on its PATH.
 
 For PowerShell, cmd, or shells outside Claude Code, copy a wrapper from the
 installed plugin cache into a folder on your PATH. With the default Claude
-configuration, the v0.6.4 wrappers are here:
+configuration, the v0.7.0 wrappers are here:
 
 ```
-~/.claude/plugins/cache/livepeek/livepeek/0.6.4/bin/
+~/.claude/plugins/cache/livepeek/livepeek/0.7.0/bin/
 ```
 
 These examples use `$HOME\bin` on Windows and `~/.local/bin` on macOS and
@@ -84,14 +84,14 @@ Windows PowerShell:
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\bin" | Out-Null
-Copy-Item "$HOME\.claude\plugins\cache\livepeek\livepeek\0.6.4\bin\livepeek.cmd" "$HOME\bin\livepeek.cmd"
+Copy-Item "$HOME\.claude\plugins\cache\livepeek\livepeek\0.7.0\bin\livepeek.cmd" "$HOME\bin\livepeek.cmd"
 ```
 
 macOS or Linux:
 
 ```bash
 mkdir -p ~/.local/bin
-cp ~/.claude/plugins/cache/livepeek/livepeek/0.6.4/bin/livepeek ~/.local/bin/livepeek
+cp ~/.claude/plugins/cache/livepeek/livepeek/0.7.0/bin/livepeek ~/.local/bin/livepeek
 chmod +x ~/.local/bin/livepeek
 ```
 
@@ -240,6 +240,9 @@ Focus the pane first: `alt`+arrow in most terminals, `prefix`+arrow in tmux.
 | `+` `-` `0` | zoom in / out / reset |
 | `c` | copy the frame to the clipboard as an image |
 | `w` | open the page in your own browser, full size (or click the address in the header) |
+| `g` | go to a page: type `/settings` (or `localhost:3000`) and press enter |
+| `x` | point at something: hover outlines it, a click picks it for Claude and copies a reference to paste |
+| `m` | QR code: scan it to open the page on your phone (same Wi-Fi) |
 | `.` | pause refreshing |
 | `b` | cycle renderer: kitty, sixel, text, half-blocks |
 | `q` | quit and close the pane |
@@ -300,6 +303,7 @@ analogue-feeling input will be approximate.
 /livepeek:livepeek --file docs/spec.md      show one file (markdown or html)
 /livepeek:livepeek --snapshot out.png       write what the pane shows to a PNG
 /livepeek:livepeek --eval 'innerWidth'      run a snippet in the shown page
+/livepeek:livepeek --picked                 the element you last pointed at (x, then click), as JSON
 /livepeek:livepeek --here                   run in this pane, don't split
 /livepeek:livepeek --new                    force a second pane instead of reusing
 /livepeek:livepeek --quit                   close the open pane cleanly
@@ -316,6 +320,11 @@ and `--eval` runs a snippet in it and prints the result. The bundled skill
 tells Claude to use both after it edits something you can see: change, wait a
 beat, snapshot, look, then report what's actually on screen. You stop being
 the one who has to say "no, it's still wrong".
+
+It works the other way too. Press `x` in the pane and click the thing you
+mean, then tell Claude "make this bigger". It reads your pick with
+`--picked`: the element's text, a selector, and the React or Vue component
+that drew it, so "this" needs no describing.
 
 ## Limits
 

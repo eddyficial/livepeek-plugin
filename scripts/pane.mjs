@@ -54,6 +54,22 @@ if (flag('--status')) {
   process.exit(0);
 }
 
+// --picked: the element the user last pointed at in the pane (x, then a
+// click), as JSON. This is how Claude resolves "this" in "make this bigger".
+if (flag('--picked')) {
+  const r = session.resolve();
+  if (!r.pane) {
+    console.error(noPaneMessage(r.error));
+    process.exit(1);
+  }
+  if (!r.pane.picked) {
+    console.log('nothing picked yet: the user presses x in the pane, then clicks an element.');
+    process.exit(0);
+  }
+  console.log(JSON.stringify(r.pane.picked, null, 2));
+  process.exit(0);
+}
+
 /** Why a control command found no pane to talk to. */
 function noPaneMessage(why) {
   if (why === 'several') return 'several livepeek panes are open, none of them opened from this terminal. Run this from the terminal that opened the one you mean.';

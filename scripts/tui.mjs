@@ -41,6 +41,9 @@ import { findDriver } from './lib/driver.mjs';
 import { encodePng } from './lib/pngenc.mjs';
 import { phoneGeometry, composePhone } from './lib/phone.mjs';
 import { bareGeometry, composeBare } from './lib/bare.mjs';
+import { pickProbe, pickReference } from './lib/pick.mjs';
+import { lanAddresses, phoneUrl, reachable } from './lib/lan.mjs';
+import { qrHalfBlocks } from './lib/qr.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ESC = '\x1b';
@@ -255,6 +258,20 @@ let lastLayout = null;
 // necessarily means 'q' no longer quits, so the only ways out are esc and
 // ctrl+c. The footer says so loudly while it is on.
 let typing = false;
+let pointing = false;     // point mode (x): the next click picks an element instead of clicking it
+let picked = null;        // the last pick, kept in the session file for --picked
+let prompt = null;        // { text } while the go-to line (g) is open in the footer
+let pageHref = '';        // the page's own address, which moves as the user navigates
+let noticeUntil = 0;      // a footer notice holds until then before 'live' replaces it,
+let noticeMsg = '';       // unless something else has taken the footer since
+let lanServer = null;     // livepeek's own server answering on the LAN too (m, then s)
+
+/** A footer message that outlasts the next few frames instead of one. */
+function notice(msg, ms = 3000) {
+  statusMsg = noticeMsg = msg;
+  noticeUntil = Date.now() + ms;
+  drawFooter(lastLayout || layout());
+}
 
 // ------------------------------------------------------------- targets ----
 /**
@@ -330,7 +347,9 @@ let staticServer = null;
 async function serveFolder(opts) {
   const r = await serveStatic(opts);
   try { staticServer?.close(); } catch { /* already closed */ }
+  try { lanServer?.close(); } catch { /* already closed */ }
   staticServer = r.server;
+  lanServer = null;
   return r;
 }
 
@@ -392,6 +411,7 @@ function publish(extra = {}) {
     rev: myRev,
     snapshotDone,
     errors: errors.length,
+    picked,
     ...extra,
   });
 }
@@ -581,7 +601,7 @@ function linkLabel(href) {
  * URL at every & in a query string. A click passes the address it was drawn
  * with, so a retarget in between cannot open something else.
  */
-async function openInBrowser(href = openable(currentTarget)) {
+async function openInBrowser(href = openable(pageHref) || openable(currentTarget)) {
   if (!href) return;
   const { spawn } = await import('node:child_process');
   const [cmd, args] = process.platform === 'win32' ? ['rundll32', ['url.dll,FileProtocolHandler', href]]
@@ -677,7 +697,7 @@ function drawHeader(L) {
   // drop the metadata before letting the header wrap; the link goes last
   if (zoom !== 1) meta += `  ×${zoom}`;
   if (colorScheme) meta += `  ${colorScheme}`;
-  const href = openable(currentTarget);
+  const href = openable(pageHref) || openable(currentTarget);
   let link = linkLabel(href);
   if (link && link.length > L.cols - label.length - 7) link = '';
   const budget = L.cols - label.length - 5 - (link ? link.length + 2 : 0);
@@ -692,12 +712,23 @@ function drawHeader(L) {
 }
 
 function drawFooter(L) {
+  // the go-to line takes the whole footer while it is open
+  if (prompt) {
+    const hint = '   enter go  ·  esc cancel';
+    const room = Math.max(8, L.cols - 12 - hint.length);
+    const shown = prompt.text.length > room ? '…' + prompt.text.slice(-(room - 1)) : prompt.text;
+    out(`${ESC}[?7l${ESC}[${L.rows};1H${ESC}[2K ${C.key('go to')} ${shown}${ESC}[7m ${ESC}[0m${C.dim(hint)}${ESC}[?7h`);
+    lastStatus = 'prompt';
+    return;
+  }
   const plainState = typing
     ? 'typing'
+    : pointing
+    ? 'point'
     : paused
       ? 'paused'
       : statusMsg.startsWith('!') ? statusMsg.slice(1) : statusMsg;
-  const colour = typing
+  const colour = typing || pointing
     ? C.key
     : (paused || statusMsg.startsWith('!')) ? C.bad : C.ok;
 
@@ -718,10 +749,12 @@ function drawFooter(L) {
   const sep = '  ·  ';
   const items = typing
     ? ['keys go to the page', 'esc to stop typing', 'ctrl+c quits']
+    : pointing
+    ? ['click something to pick it', 'esc to stop']
     : [renderMode, 'i type', 'p project', 'space device', 'shift+? help', 'q quit'];
-  if (!typing && errors.length) items.unshift(C.bad(`${errors.length} error${errors.length === 1 ? '' : 's'}  e`));
+  if (!typing && !pointing && errors.length) items.unshift(C.bad(`${errors.length} error${errors.length === 1 ? '' : 's'}  e`));
   // most important first; the error badge, when present, is index 0 and wins
-  const order = typing ? [2, 1, 0] : errors.length ? [0, 6, 4, 5, 3, 2, 1] : [5, 3, 4, 2, 1, 0];
+  const order = typing ? [2, 1, 0] : pointing ? [1, 0] : errors.length ? [0, 6, 4, 5, 3, 2, 1] : [5, 3, 4, 2, 1, 0];
   let chosen = [];
   for (const i of order) {
     const next = [...chosen, i].sort((x, y) => x - y);
@@ -732,7 +765,7 @@ function drawFooter(L) {
   const hint = chosen.map(j => items[j]).join(sep);
 
   out(`${ESC}[?7l${ESC}[${L.rows};1H${ESC}[2K ${colour(plainState)}  ${C.dim(hint)}${ESC}[?7h`);
-  lastStatus = statusMsg + (paused ? ':p' : '') + renderMode + (typing ? ':t' : '') + ':' + errors.length;
+  lastStatus = statusMsg + (paused ? ':p' : '') + renderMode + (typing ? ':t' : '') + (pointing ? ':x' : '') + ':' + errors.length;
 }
 
 /** Rows for whichever list the picker is currently showing. */
@@ -1150,7 +1183,7 @@ async function paint(force) {
         welcomePainted = true;
         lastStatus = null;   // Windows Terminal wipes the footer under a new sixel
       }
-      statusMsg = 'live';
+      if (Date.now() >= noticeUntil || statusMsg !== noticeMsg) statusMsg = 'live';
       if (statusMsg + (paused ? ':p' : '') + renderMode + ':' + errors.length !== lastStatus) drawFooter(L);
       return;
     }
@@ -1182,7 +1215,7 @@ async function paint(force) {
       if (menuOpen) drawMenu(L);
       if (overlay) drawOverlay(L);   // a new frame paints over it otherwise
     }
-    statusMsg = 'live';
+    if (Date.now() >= noticeUntil || statusMsg !== noticeMsg) statusMsg = 'live';
   } catch (e) {
     statusMsg = '!' + (e.message || 'screenshot failed').split('\n')[0].slice(0, 40);
     dirty = true;
@@ -1269,6 +1302,15 @@ async function handleMouse(code, col, row, press) {
   const button = code & 3;                       // 0 left, 1 middle, 2 right
   const moving = (code & 32) !== 0;
   const wheel = (code & 64) !== 0;
+
+  // Point mode: hovering outlines what a click would pick, and the click
+  // records it instead of reaching the page. Scrolling still scrolls.
+  if (pointing && !wheel) {
+    if (moving) { if (pt) queueHover(pt); return; }
+    if (!press) return;
+    if (button !== 0 || !pt) return stopPointing();
+    return pickAt(pt);
+  }
 
   if (wheel && renderMode === 'text') {
     const dir = code & 3;
@@ -1412,6 +1454,9 @@ const HELP = [
   ['+  -',    'zoom in / out  (0 resets)'],
   ['c',       'copy the frame to the clipboard'],
   ['w',       'open the page in your browser  (or click its address)'],
+  ['g',       'go to a page: type a path like /settings'],
+  ['x',       'point at something: the click picks it for Claude'],
+  ['m',       'QR code to open the page on your phone'],
   ['b',       'change renderer: kitty, sixel, text, half-blocks'],
   ['shift+?', 'this help'],
   ['q',       'quit'],
@@ -1423,17 +1468,26 @@ function drawOverlay(L) {
   const width = Math.min(L.cols - 2, 72);
   // title on row 2, the action line under the last row, and the pane's own
   // footer on the bottom row must all survive a short pane
-  const lines = overlay.rows.map(([k, d]) => `  ${k.padEnd(7)} ${d}`).slice(0, Math.max(1, L.rows - 4));
+  // A QR code goes first, centred, black on white: phone cameras want dark
+  // modules on a light ground, whatever the terminal's own colours are.
+  const qr = overlay.qr || [];
+  // a row with no key uses the whole width instead of an empty key column
+  const lines = overlay.rows.map(([k, d]) => k ? `  ${k.padEnd(7)} ${d}` : `  ${d}`).slice(0, Math.max(1, L.rows - 4 - qr.length));
   out(`${ESC}[2;2H${C.head((' ' + overlay.title + ' ').padEnd(width).slice(0, width))}`);
+  qr.forEach((q, i) => {
+    const pad = Math.max(0, Math.floor((width - q.length) / 2));
+    const rest = Math.max(0, width - pad - q.length);
+    out(`${ESC}[${3 + i};2H${ESC}[48;5;236m${' '.repeat(pad)}${ESC}[48;5;231m${ESC}[38;5;16m${q}${ESC}[48;5;236m${' '.repeat(rest)}${ESC}[0m`);
+  });
   lines.forEach((text, i) => {
     const line = text.padEnd(width).slice(0, width);
-    out(`${ESC}[${3 + i};2H${ESC}[48;5;236m${ESC}[38;5;252m${line}${ESC}[0m`);
+    out(`${ESC}[${3 + qr.length + i};2H${ESC}[48;5;236m${ESC}[38;5;252m${line}${ESC}[0m`);
   });
-  out(`${ESC}[${3 + lines.length};2H${ESC}[48;5;236m${ESC}[38;5;245m${'  any key to close'.padEnd(width)}${ESC}[0m`);
-  overlay.height = lines.length + 2;   // what closeOverlay has to wipe
+  out(`${ESC}[${3 + qr.length + lines.length};2H${ESC}[48;5;236m${ESC}[38;5;245m${'  any key to close'.padEnd(width)}${ESC}[0m`);
+  overlay.height = qr.length + lines.length + 2;   // what closeOverlay has to wipe
 }
-function openOverlay(title, rows) {
-  overlay = { title, rows };
+function openOverlay(title, rows, extra = {}) {
+  overlay = { title, rows, ...extra };
   drawOverlay(lastLayout || layout());
 }
 function closeOverlay() {
@@ -1441,6 +1495,177 @@ function closeOverlay() {
   const n = overlay.height || overlay.rows.length + 2;
   overlay = null;
   uncover(n);
+}
+
+// ------------------------------------------------------- point, go, phone ----
+// Hover outlines are coalesced: only the newest pointer position is drawn,
+// by one worker, so a burst of motion never queues up behind slow frames and
+// delays the click that follows it.
+let hoverPt = null;
+let hoverBusy = false;
+function queueHover(pt) {
+  hoverPt = pt;
+  if (hoverBusy) return;
+  hoverBusy = true;
+  (async () => {
+    try {
+      while (hoverPt && pointing) {
+        const at = hoverPt;
+        hoverPt = null;
+        try { await page.evaluate(pickProbe, { pt: at, mode: 'hover' }); } catch { /* mid-navigation */ }
+        await tick(true);
+      }
+    } finally { hoverBusy = false; hoverPt = null; }
+  })();
+}
+
+/**
+ * Run fn with the page to itself, as a control request does: no frame is
+ * taken while it navigates, since a screenshot caught by a navigation stalls
+ * every later one. Its own repaints still go through (controlScope).
+ */
+async function exclusive(fn) {
+  while (controlBusy || ticking) await new Promise(r => setTimeout(r, 30));
+  controlBusy = true;
+  try { return await controlScope.run(true, fn); }
+  finally { controlBusy = false; }
+}
+/** Leave point mode and take the outline off the page. */
+async function stopPointing() {
+  pointing = false;
+  try { await page.evaluate(pickProbe, { pt: null, mode: 'clear' }); } catch { /* mid-navigation */ }
+  drawFooter(lastLayout || layout());
+  await tick(true);
+}
+
+/** Record what is under pt: on file for --picked, and on the clipboard to paste into Claude. */
+async function pickAt(pt) {
+  pointing = false;
+  let info = null;
+  try { info = await page.evaluate(pickProbe, { pt, mode: 'pick' }); } catch { /* mid-navigation */ }
+  if (!info) { notice('!nothing there to pick'); return tick(true); }
+  picked = { ...info, url: pageHref || currentTarget, preset: devices[deviceIdx]?.id, viewport: vp(), at: new Date().toISOString() };
+  publishIfIdle();
+  const copied = await copyText(pickReference(picked));
+  notice(`picked <${info.tag}>${copied ? ' · copied, paste it to Claude' : ''}`, 5000);
+  await tick(true);
+}
+
+/** Put text on the system clipboard. False when there is no clipboard tool. */
+async function copyText(text) {
+  const { spawnSync } = await import('node:child_process');
+  const run = (cmd, args) => spawnSync(cmd, args, { input: Buffer.from(text, 'utf8'), windowsHide: true });
+  let r;
+  // Set-Clipboard keeps non-ASCII text intact, which clip.exe does not
+  if (process.platform === 'win32') {
+    r = run('powershell', ['-NoProfile', '-Command',
+      '$in = New-Object IO.StreamReader([Console]::OpenStandardInput(), [Text.Encoding]::UTF8); Set-Clipboard -Value $in.ReadToEnd()']);
+  } else if (process.platform === 'darwin') {
+    r = run('pbcopy', []);
+  } else {
+    r = run('sh', ['-c', 'wl-copy 2>/dev/null || xclip -selection clipboard']);
+  }
+  return !!r && r.status === 0;
+}
+
+/** Navigate the page to what was typed on the go-to line: a path, or a whole address. */
+async function goTo(text) {
+  text = text.trim();
+  if (!text) return;
+  // localhost:3000 or 192.168.1.5:8080 is an address, not a path under this page
+  if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(text) && /^(localhost|\d+\.\d+\.\d+\.\d+|[\w.-]+:\d+)([/?#:]|$)/i.test(text)) {
+    text = 'http://' + text;
+  }
+  let href = null;
+  try { href = openable(new URL(text, pageHref || currentTarget).href); } catch { /* not an address */ }
+  if (!href) return notice('!not an address: ' + text.slice(0, 30));
+  // another server is another project: make it the pane's target, as p would
+  let sameServer = false;
+  try { sameServer = new URL(href).origin === new URL(currentTarget).origin; } catch { /* no current target */ }
+  if (!sameServer) { currentTarget = new URL(href).origin + '/'; publishIfIdle(); }
+  statusMsg = 'loading';
+  drawFooter(lastLayout || layout());
+  await exclusive(async () => {
+    try { await page.goto(href, { waitUntil: 'domcontentloaded', timeout: 30000 }); }
+    catch { return notice('!could not load ' + href.slice(0, 40)); }
+    lastShot = null; dirty = true;
+    await tick(true);
+  });
+}
+
+/**
+ * m: a QR code for the page at this machine's LAN address, so a phone on the
+ * same Wi-Fi opens the real thing. A server that answers loopback only cannot
+ * be reached that way, and the overlay says how to fix that instead.
+ */
+async function showPhoneCode() {
+  if (menuOpen) closeMenu();
+  const href = openable(pageHref) || openable(currentTarget);
+  if (!href) return notice('!no web address to share');
+  const [lan] = lanAddresses();
+  if (!lan) {
+    return openOverlay('open on your phone', [['', 'this computer is not on a network a phone can reach;'], ['', 'join Wi-Fi or Ethernet, then press m again']]);
+  }
+  const url = phoneUrl(href, lan.address);
+  const u = new URL(url);
+  const port = Number(u.port || (u.protocol === 'https:' ? 443 : 80));
+  if (!(await reachable(u.hostname, port))) {
+    const ours = staticServer && port === staticServer.address()?.port
+      && ['localhost', '127.0.0.1'].includes(new URL(href).hostname);
+    if (ours) {
+      return openOverlay('open on your phone', [
+        ['', "livepeek's server only answers this computer."],
+        ['s', 'share it on your Wi-Fi until livepeek quits'],
+      ], { share: true });
+    }
+    return openOverlay('open on your phone', [
+      ['', 'the dev server only answers this computer.'],
+      ['', 'restart it on the network, then press m:'],
+      ['', 'npm run dev -- --host      Vite, Astro'],
+      ['', 'npm run dev -- -H 0.0.0.0  Next.js'],
+    ]);
+  }
+  let qr;
+  try { qr = qrHalfBlocks(url, { ecl: 'M' }); } catch { return notice('!address too long for a QR code'); }
+  const L = lastLayout || layout();
+  const rows = [
+    ['', url],
+    ['', 'scan with your phone camera (same Wi-Fi)'],
+    ['', 'not loading? allow Node.js in the firewall'],
+  ];
+  if (qr.length + rows.length + 4 > L.rows || qr[0].length + 4 > L.cols) {
+    return openOverlay('open on your phone', [['', 'make the pane bigger to fit the code, or type this:'], ['', url]]);
+  }
+  openOverlay('open on your phone', rows, { qr });
+}
+
+/** s on the phone overlay: livepeek's own server answers on the LAN address too. */
+async function shareOnLan() {
+  closeOverlay();
+  const [lan] = lanAddresses();
+  const port = staticServer?.address()?.port;
+  if (!port || !lan) return tick(true);
+  try { lanServer?.close(); } catch { /* already closed */ }
+  const http = await import('node:http');
+  // Bound to the server shared now: after a folder switch it must not start
+  // answering for the new folder. Claimed before listen() resolves, so a
+  // switch meanwhile (serveFolder) closes it too.
+  const shared = staticServer;
+  const srv = http.createServer((req, res) => shared.emit('request', req, res));
+  lanServer = srv;
+  try {
+    await new Promise((resolve, reject) => { srv.once('error', reject); srv.listen(port, lan.address, resolve); });
+  } catch {
+    if (lanServer === srv) lanServer = null;
+    notice('!could not share on ' + lan.address);
+    return tick(true);
+  }
+  if (lanServer !== srv || staticServer !== shared) {   // switched away while it was starting
+    try { srv.close(); } catch { /* already closed */ }
+    return tick(true);
+  }
+  await tick(true);
+  return showPhoneCode();
 }
 
 // ------------------------------------------------------------- welcome ----
@@ -1914,6 +2139,10 @@ async function main() {
   });
   page.on('framenavigated', f => {
     if (f !== page.mainFrame()) return;
+    if (f.url() !== pageHref) {
+      pageHref = f.url();
+      if (lastLayout) drawHeader(lastLayout);   // the address in it moves with the page
+    }
     errors = [];
     publishIfIdle();         // the count on file starts afresh too
     lastTextKey = ''; textScroll = 0;
@@ -1969,6 +2198,27 @@ async function main() {
     // escape there is no way out of typing if the page swallows esc.
     if (ev.t === 'char' && ev.ch === '\x03') return shutdown();
 
+    // the go-to line owns the keyboard while it is open
+    if (prompt) {
+      if (ev.t !== 'char' || ev.alt) return;
+      const c = ev.ch;
+      if (c === ESC) { prompt = null; drawFooter(lastLayout || layout()); return; }
+      if (c === '\r' || c === '\n') {
+        const text = prompt.text;
+        prompt = null;
+        drawFooter(lastLayout || layout());
+        return goTo(text);
+      }
+      if (c === '\x7f' || c === '\b') prompt.text = prompt.text.slice(0, -1);
+      else {
+        const clean = c.replace(/[\x00-\x1f\x7f]/g, '');
+        if (!clean) return;
+        prompt.text = (prompt.text + clean).slice(0, 500);
+      }
+      drawFooter(lastLayout || layout());
+      return;
+    }
+
     if (typing) {
       if (ev.t === 'char' && ev.ch === ESC) {
         typing = false;
@@ -2005,7 +2255,12 @@ async function main() {
     const k = ev.ch;
     if (ev.alt) return;                 // alt+letter is not one of our bindings
 
+    if (overlay?.share && k === 's') return shareOnLan();
     if (overlay) { closeOverlay(); return tick(true); }
+
+    // Point mode is modal like typing: any other key (typing, the go-to
+    // line, a picker) leaves it first, so two modes never hold at once.
+    if (pointing && k !== 'x' && k !== ESC) await stopPointing();
 
     // while the device picker is open, letters narrow the list. Space still
     // closes an untouched picker, but once a filter is started it is part of
@@ -2030,7 +2285,11 @@ async function main() {
     }
 
     if (k === 'q') return shutdown();
-    if (k === ESC) { if (menuOpen) { closeMenu(); await tick(true); } return; }
+    if (k === ESC) {
+      if (pointing) return stopPointing();
+      if (menuOpen) { closeMenu(); await tick(true); }
+      return;
+    }
 
     if (k === 'i') { typing = true; await applyPageState(); drawFooter(lastLayout || layout()); }
     else if (k === ']') { deviceIdx = (deviceIdx + 1) % devices.length; await applyViewport(); }
@@ -2084,6 +2343,22 @@ async function main() {
     }
     else if (k === 'c') { await copyFrame(); }
     else if (k === 'w') { await openInBrowser(); }
+    else if (k === 'g') {
+      if (menuOpen) { closeMenu(); await tick(true); }
+      // start from where the page is, so a tweak is a few keys away
+      let start = '/';
+      try { const u = new URL(pageHref || currentTarget); start = u.pathname + u.search + u.hash; } catch { /* keep / */ }
+      prompt = { text: start };
+      drawFooter(lastLayout || layout());
+    }
+    else if (k === 'x') {
+      if (pointing) return stopPointing();
+      if (renderMode === 'text') return notice('!point mode needs the picture; press b');
+      if (menuOpen) { closeMenu(); await tick(true); }
+      pointing = true;
+      drawFooter(lastLayout || layout());
+    }
+    else if (k === 'm') { await showPhoneCode(); }
   }
 
   process.stdin.on('data', (chunk) => {

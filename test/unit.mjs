@@ -5,6 +5,54 @@ import { HOME, TMP, lib, tmpdir, test, eq, assert, serve, httpGetRaw } from './h
 
 const ESC = '\x1b';
 
+await test('qr chooses the smallest fitting version and draws three finders', async () => {
+  const { qrMatrix } = await lib('qr.mjs');
+  const { size, modules } = qrMatrix('http://192.168.1.23:5173/', { ecl: 'M' });
+  eq(size, 25, '25-byte level-M URL fits version 2');
+  eq(modules.length, size, 'matrix height');
+  assert(modules.every(row => row.length === size && row.every(v => typeof v === 'boolean')), 'matrix is not boolean and square');
+  const finder = [
+    '1111111', '1000001', '1011101', '1011101', '1011101', '1000001', '1111111',
+  ];
+  for (const [x0, y0] of [[0, 0], [size - 7, 0], [0, size - 7]]) {
+    eq(modules.slice(y0, y0 + 7).map(row => row.slice(x0, x0 + 7).map(Number).join('')), finder, `finder at ${x0},${y0}`);
+  }
+});
+
+await test('qr.halfBlocks includes a two-module quiet zone and packs two rows', async () => {
+  const { qrMatrix, qrHalfBlocks } = await lib('qr.mjs');
+  const text = 'http://192.168.1.23:5173/';
+  const { size } = qrMatrix(text);
+  const rows = qrHalfBlocks(text);
+  eq(rows.length, Math.ceil((size + 4) / 2), 'terminal row count');
+  assert(rows.every(row => row.length === size + 4), 'terminal row width');
+  assert(rows.every(row => /^[ ▀▄█]+$/.test(row)), 'unexpected terminal glyph');
+  assert(rows[0] === ' '.repeat(size + 4), 'top quiet zone missing');
+});
+await test('lan: Wi-Fi addresses first, virtual adapters and link-local left out', async () => {
+  const { lanAddresses, phoneUrl } = await lib('lan.mjs');
+  const got = lanAddresses({
+    'vEthernet (WSL)': [{ family: 'IPv4', address: '172.20.48.1', internal: false }],
+    'Ethernet 2': [{ family: 'IPv4', address: '10.0.0.7', internal: false }],
+    'Wi-Fi': [{ family: 'IPv4', address: '192.168.4.76', internal: false }, { family: 'IPv6', address: 'fe80::1', internal: false }],
+    'Loopback Pseudo-Interface 1': [{ family: 'IPv4', address: '127.0.0.1', internal: true }],
+    'Local Area Connection': [{ family: 'IPv4', address: '169.254.10.2', internal: false }],
+  });
+  eq(got.map(a => a.address), ['192.168.4.76', '10.0.0.7'], 'ranked, filtered');
+  eq(phoneUrl('http://localhost:5173/settings?tab=1', '192.168.4.76'), 'http://192.168.4.76:5173/settings?tab=1', 'loopback swapped');
+  eq(phoneUrl('http://127.0.0.1:8080/', '10.0.0.7'), 'http://10.0.0.7:8080/', '127.0.0.1 swapped');
+  eq(phoneUrl('https://example.com/x', '10.0.0.7'), 'https://example.com/x', 'a real host is left alone');
+});
+
+await test('pick: the clipboard reference is one plain-ASCII line', async () => {
+  const { pickReference } = await lib('pick.mjs');
+  const line = pickReference({ tag: 'button', text: 'Start 16:8 fast', selector: 'button.btn.primary', component: 'StartCard', url: 'http://localhost:5173/' });
+  eq(line, '[livepeek pick] <button> | "Start 16:8 fast" | button.btn.primary | in <StartCard> | on http://localhost:5173/', 'reference');
+  const long = pickReference({ tag: 'p', text: 'x'.repeat(100), selector: 'p', component: null, url: '' });
+  assert(/^[\x20-\x7e]+$/.test(long) && long.includes('x'.repeat(57) + '...'), 'long text is cut with ASCII dots');
+});
+
+
 // ------------------------------------------------------------ a. unit ----
 await test('png.resize averages a 4x4 image to 2x2', async () => {
   const { resize } = await lib('png.mjs');
@@ -99,6 +147,33 @@ await test('serveStatic refuses path traversal, including sibling dirs sharing t
       const r = await httpGetRaw(url, p);
       assert(r.status === 403 || r.status === 404, `${p}: status ${r.status}, want 403 or 404`);
       assert(!r.body.includes('SECRET') && !r.body.includes('OUTSIDE'), `${p}: leaked file contents`);
+    }
+    eq((await httpGetRaw(url, '/index.html')).status, 200, 'legit file still served');
+  } finally {
+    if (server) { server.close(); server.closeAllConnections?.(); }
+    fs.rmSync(base, { recursive: true, force: true });
+  }
+});
+
+await test('serveStatic refuses links out of the root, and dot-files', async () => {
+  const base = tmpdir('serve-links');
+  let server;
+  try {
+    fs.mkdirSync(path.join(base, 'site'));
+    fs.mkdirSync(path.join(base, 'private'));
+    fs.writeFileSync(path.join(base, 'site', 'index.html'), '<h1>ok</h1>');
+    fs.writeFileSync(path.join(base, 'site', '.env'), 'TOKEN=SECRET');
+    fs.writeFileSync(path.join(base, 'private', 'secret.txt'), 'SECRET');
+    // a junction needs no admin rights on Windows; a plain symlink elsewhere
+    fs.symlinkSync(path.join(base, 'private'), path.join(base, 'site', 'escape'), process.platform === 'win32' ? 'junction' : 'dir');
+    const { serveStatic } = await lib('serve.mjs');
+    let port;
+    ({ server, port } = await serveStatic({ root: path.join(base, 'site') }));
+    const url = `http://127.0.0.1:${port}/`;
+    for (const p of ['/escape/secret.txt', '/escape/', '/.env']) {
+      const r = await httpGetRaw(url, p);
+      assert(r.status === 403 || r.status === 404, `${p}: status ${r.status}, want 403 or 404`);
+      assert(!r.body.includes('SECRET'), `${p}: leaked file contents`);
     }
     eq((await httpGetRaw(url, '/index.html')).status, 200, 'legit file still served');
   } finally {

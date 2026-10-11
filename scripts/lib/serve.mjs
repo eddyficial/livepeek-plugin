@@ -163,6 +163,11 @@ function wrapDoc(title, body) {
  */
 export function serveStatic({ root, file = null, port = 0 }) {
   root = path.resolve(root);
+  // The root as the disk sees it, links followed, for the containment check
+  // on what a request actually reaches.
+  let realRoot = root;
+  try { realRoot = fs.realpathSync(root); } catch { /* checked per request */ }
+  const inside = (p) => p === realRoot || p.startsWith(realRoot + path.sep);
   const server = http.createServer((req, res) => {
     // Anything that throws in here - a file deleted between stat and read, a
     // folder that cannot be listed - answers 500 rather than crashing the
@@ -195,12 +200,24 @@ export function serveStatic({ root, file = null, port = 0 }) {
     // Never escape the root. A plain prefix test is not enough: "/proj" is
     // a prefix of "/proj2", so the check is root itself or root + separator.
     if (target !== root && !target.startsWith(root + path.sep)) { res.writeHead(403); return res.end('forbidden'); }
+    // Dot-files and dot-folders (.env, .git) are never part of a page, and
+    // the folder can be shared on the network (m, then s in the pane).
+    if (path.relative(root, target).split(path.sep).some(part => part.startsWith('.'))) {
+      res.writeHead(404); return res.end('not found: ' + url.pathname);
+    }
+    // The lexical check above does not see links: a symlink or junction in
+    // the folder could still lead outside it. Check where it really goes.
+    const reaches = (p) => { try { return inside(fs.realpathSync(p)); } catch { return true; /* missing: 404 below */ } };
+    if (!reaches(target)) { res.writeHead(403); return res.end('forbidden'); }
 
     let st;
     try { st = fs.statSync(target); } catch { res.writeHead(404); return res.end('not found: ' + url.pathname); }
     if (st.isDirectory()) {
       const idx = path.join(target, 'index.html');
-      if (fs.existsSync(idx)) target = idx;
+      if (fs.existsSync(idx)) {
+        if (!reaches(idx)) { res.writeHead(403); return res.end('forbidden'); }
+        target = idx;
+      }
       else {
         const items = fs.readdirSync(target).filter(n => !n.startsWith('.')).sort();
         const body = `<h1>${esc(path.basename(target) || '/')}</h1><ul>` +
