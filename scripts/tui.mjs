@@ -34,6 +34,7 @@ import * as session from './lib/session.mjs';
 import { serveStatic } from './lib/serve.mjs';
 import * as projects from './lib/projects.mjs';
 import * as intro from './lib/intro.mjs';
+import { menuHtml, iconOf, HEAD_ROWS, ROW_H, FOOT_ROWS } from './lib/menuview.mjs';
 import { EXTRACT, layoutText } from './lib/textview.mjs';
 import { findDriver } from './lib/driver.mjs';
 import { encodePng } from './lib/pngenc.mjs';
@@ -532,7 +533,7 @@ function shortDir(dir) {
 let menuMode = 'preset';          // 'preset' | 'target'
 let menuOpen = false;
 let menuHover = -1;
-let menuBox = null;      // {top,left,width,height,first,count}
+let menuBox = null;      // {top,left,width,height,first,count, rowH,rows,image}
 let headerHit = null;    // {row,col0,col1}
 
 const C = {
@@ -560,6 +561,7 @@ async function applySize(rows, cols) {
   const L = lastLayout || layout();
   if (rows === L.rows && cols === L.cols) return;
   probedSize = { rows, cols };
+  menuKey = null;                   // an in-flight picker render is the old size
   dirty = true; lastShot = null; lastTextKey = '';
   await tick(true);
 }
@@ -669,6 +671,7 @@ function menuItems() {
     return targets.map((t, i) => ({
       idx: i,
       name: `${t.label}  ${t.sub}`,
+      label: t.label, sub: t.sub,
       right: isShowing(t) ? 'showing' : t.running ? 'running' : 'stopped',
       active: isShowing(t),
     }));
@@ -691,6 +694,11 @@ function isShowing(t) {
 let shownDir = STATIC_DIR || null;
 
 function drawMenu(L) {
+  if ((renderMode === 'sixel' || renderMode === 'kitty') && browser && menuSlots(L) >= 3) return drawMenuImage(L);
+  drawMenuText(L);
+}
+
+function drawMenuText(L) {
   const items = menuItems();
   if (!items.length) {
     out(`${ESC}[2;2H${C.head(` no match for "${menuFilter}" - backspace to clear `)}`);
@@ -730,6 +738,100 @@ function drawMenu(L) {
     const row = top + i;
     out(`${ESC}[${row};${left}H`);
     out(idx === menuHover ? C.sel(text) : `${ESC}[48;5;236m${ESC}[38;5;252m${text}${ESC}[0m`);
+  }
+}
+
+// ------------------------------------------------------ picker image ----
+// With an image renderer the picker is a picture (see lib/menuview.mjs): laid
+// out in a private tab, screenshotted, painted over the page. Rendering is
+// async, so draws only record the newest state and one loop renders it; a
+// state seen before comes from the cache and paints at once, which keeps
+// hover and arrow keys responsive.
+let menuTab = null;
+let menuTabP = null;
+let menuWant = null;          // newest picker state waiting for a render
+let menuKey = null;           // the state that should be on screen now
+let menuRendering = false;
+const menuCache = new Map();  // state -> encoded image sequence
+
+/** Entries that fit: the panel ends where the page image does, clear of the footer. */
+function menuSlots(L) {
+  return Math.floor((L.rows - 5 - HEAD_ROWS - FOOT_ROWS) / ROW_H);
+}
+
+function drawMenuImage(L) {
+  const items = menuItems();
+  // The panel is sized for the whole list, not the filtered one, so it never
+  // shrinks while typing and leaves nothing behind to clean up.
+  const all = menuMode === 'target' ? targets : devices;
+  const slots = Math.max(1, Math.min(menuSlots(L), all.length));
+  const count = Math.min(items.length, slots);
+  const active = items.findIndex(it => it.active);
+  const anchor = menuHover >= 0 ? menuHover : Math.max(0, active);
+  let first = 0;
+  if (items.length > count) first = Math.min(Math.max(0, anchor - (count >> 1)), items.length - count);
+
+  const maxName = Math.max(10, ...all.map(x => (x.label || x.name || '').length));
+  const width = Math.min(L.cols - 2, Math.max(36, Math.min(60, Math.ceil(maxName * 0.8) + 24)));
+  const rows = HEAD_ROWS + slots * ROW_H + FOOT_ROWS + 1;
+  menuBox = { top: 2 + HEAD_ROWS, left: 2, width, height: count * ROW_H, rowH: ROW_H, first, count, total: items.length, rows, image: true };
+
+  const view = {
+    cw, ch, bg: termBg,
+    title: menuMode === 'target' ? 'Project' : 'Device',
+    filter: menuFilter,
+    placeholder: menuMode === 'target' ? 'Pick a project' : 'Type to filter',
+    first, total: items.length,
+    empty: items.length ? '' : menuMode === 'target' ? 'No projects yet' : `No device matches "${menuFilter}"`,
+    rows: items.slice(first, first + count).map((it, i) => {
+      const d = menuMode === 'target' ? null : devices[it.idx];
+      return {
+        name: d ? d.name : it.label, sub: d ? (d.brand === d.os ? d.os : `${d.brand} · ${d.os}`) : it.sub,
+        right: it.right, active: it.active, hover: first + i === menuHover, icon: iconOf(d),
+      };
+    }),
+  };
+  const size = { width: Math.round(width * cw), height: Math.round(rows * ch) };
+  const key = JSON.stringify([view, size, renderMode]);
+  menuKey = key;
+  const seq = menuCache.get(key);
+  if (seq) { menuWant = null; paintMenu(seq); return; }
+  menuWant = { key, view, size, mode: renderMode };
+  if (!menuRendering) renderMenuImages();
+}
+
+function paintMenu(seq) {
+  out(`${ESC}[2;2H`);
+  out(caps.tmux ? tmuxWrap(seq) : seq);
+}
+
+function warmMenuTab() {
+  menuTabP ||= browser.newPage({ viewport: { width: 400, height: 600 }, deviceScaleFactor: 1 });
+  return menuTabP;
+}
+
+async function renderMenuImages() {
+  menuRendering = true;
+  try {
+    while (menuWant) {
+      const { key, view, size, mode } = menuWant;
+      menuWant = null;
+      menuTab ||= await warmMenuTab();
+      const v = menuTab.viewportSize();
+      if (!v || v.width !== size.width || v.height !== size.height) await menuTab.setViewportSize(size);
+      await menuTab.setContent(menuHtml(view));
+      const img = decodePng(await menuTab.screenshot({ type: 'png' }));
+      const seq = mode === 'kitty' ? toKitty(img, { id: 2 }) : toSixel(img, 256);
+      if (menuCache.size > 80) menuCache.clear();
+      menuCache.set(key, seq);
+      // only if nothing newer was drawn or queued meanwhile, and still open
+      if (key === menuKey && menuOpen && menuBox?.image) paintMenu(seq);
+    }
+  } catch {
+    // leave the picker as it is; the next draw tries again with a fresh tab
+    menuTab = null; menuTabP = null;
+  } finally {
+    menuRendering = false;
   }
 }
 
@@ -1015,15 +1117,20 @@ async function handleMouse(code, col, row, press) {
   if (menuOpen) {
     const inMenu = menuBox && row >= menuBox.top && row < menuBox.top + menuBox.height
                             && col >= menuBox.left && col < menuBox.left + menuBox.width;
+    const rowH = menuBox?.rowH || 1;
+    const at = inMenu ? menuBox.first + Math.floor((row - menuBox.top) / rowH) : -1;
+    // the picture's search field and key hints are part of the menu too
+    const inPanel = menuBox?.image && row >= 2 && row < 2 + menuBox.rows
+                    && col >= menuBox.left && col < menuBox.left + menuBox.width;
     if (code === 35 || code === 32) {           // motion
-      const h = inMenu ? menuBox.first + (row - menuBox.top) : -1;
+      const h = at;
       if (h !== menuHover) { menuHover = h; drawMenu(lastLayout); }
       return;
     }
     if (press && code === 0) {
       if (inMenu) {
-        await menuSelect(menuBox.first + (row - menuBox.top));
-      } else {
+        await menuSelect(at);
+      } else if (!inPanel) {
         closeMenu();
         await tick(true);
       }
@@ -1349,7 +1456,12 @@ function closeMenu() {
  */
 function uncover(rows = 0) {
   const L = lastLayout || layout();
-  const n = rows || (menuBox ? menuBox.height + 1 : 0) || 4;
+  const n = rows || (menuBox ? menuBox.rows || menuBox.height + 1 : 0) || 4;
+  // the picker picture is its own kitty image; erasing cells does not remove it
+  if (menuBox?.image && renderMode === 'kitty') {
+    const del = `${ESC}_Ga=d,d=I,i=2,q=2${ESC}\\`;
+    out(caps.tmux ? tmuxWrap(del) : del);
+  }
   // Cells under the image are left alone: the repaint covers them, and
   // erasing cells under a sixel shows as a black band until the next frame.
   // Everything else the overlay touched is wiped. Text mode has no image, and
@@ -1630,6 +1742,7 @@ async function main() {
   // instead of jagged. Snapshots are written at this 2x size too.
   const ctx = await browser.newContext({ viewport: vp(), deviceScaleFactor: 2 });
   page = await ctx.newPage();
+  if (renderMode === 'sixel' || renderMode === 'kitty') warmMenuTab().catch(() => { menuTabP = null; });
 
   // Text mode has no picture to paint a welcome screen with.
   if (renderMode !== 'text' && intro.due()) {
@@ -1698,6 +1811,7 @@ async function main() {
   process.stdout.on('resize', () => {
     probedSize = null;              // from here on process.stdout is current
     dirty = true; lastShot = null;
+    menuKey = null;                 // an in-flight picker render is the old size
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(() => {
       if (devices[deviceIdx]?.fit) applyViewport().catch(() => {});   // re-render at the new pane size
@@ -1763,7 +1877,9 @@ async function main() {
       else if (k >= ' ' && k.length === 1) menuFilter += k;
       else return;
       menuHover = 0;
-      dirty = true; await tick(true);   // repaint under the shorter/longer list
+      // the text list changes length and needs the page repainted under it;
+      // the picture keeps its size
+      if (!menuBox?.image) { dirty = true; await tick(true); }
       drawMenu(lastLayout || layout());
       return;
     }

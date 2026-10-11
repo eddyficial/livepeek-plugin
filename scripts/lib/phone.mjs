@@ -24,6 +24,16 @@ function blend(buf, i, r, g, b, a) {
 }
 
 /**
+ * Height of the status bar above the page, in logical px. On a real phone the
+ * camera cutout sits in this strip and the page starts below it; without it
+ * the island lands on top of the page's own header.
+ */
+export function statusBarOf(device) {
+  if (device.chin) return 20;
+  return { island: 54, notch: 47, hole: 36 }[device.cut] ?? 24;
+}
+
+/**
  * Phone geometry in the device's own logical pixels.
  *
  * Returned rects are what the compositor draws and what the caller uses to
@@ -40,13 +50,18 @@ export function phoneGeometry(device, landscape = false) {
   const bottom = device.chin ? 96 : 12;
 
   const bodyW = w + side * 2;
-  const bodyH = h + top + bottom;
+  const bar = statusBarOf(device);
+  const bodyH = h + bar + top + bottom;
   const screenR = device.r;
   const bodyR = device.chin ? 24 : screenR + side;
 
   const g = {
     bodyW, bodyH, bodyR,
-    screenX: side, screenY: top, screenW: w, screenH: h, screenR,
+    // screen* is the page itself; glass is the whole lit display, the status
+    // bar strip included
+    screenX: side, screenY: top + bar, screenW: w, screenH: h, screenR,
+    glass: { x: side, y: top, w, h: h + bar, r: screenR },
+    status: { x: side, y: top, w, h: bar, cut: device.cut || 'none', chin: !!device.chin, landscape },
     cut: null,
     home: null,
     camera: null,
@@ -65,11 +80,11 @@ export function phoneGeometry(device, landscape = false) {
 
   if (device.chin) {
     // home button and earpiece live in the bezel, not over the screen
-    g.home = { type: 'button', x: bodyW / 2 - 21, y: top + h + 16, w: 42, h: 42, r: 21 };
+    g.home = { type: 'button', x: bodyW / 2 - 21, y: top + bar + h + 16, w: 42, h: 42, r: 21 };
     g.speaker = { x: bodyW / 2 - 26, y: top / 2 - 3, w: 52, h: 6, r: 3 };
     g.camera = { x: bodyW / 2 - 30, y: top / 2 - 4, w: 8, h: 8, r: 4 };
   } else {
-    g.home = { type: 'bar', x: side + w * 0.32, y: top + h - 9, w: w * 0.36, h: 5, r: 2.5 };
+    g.home = { type: 'bar', x: side + w * 0.32, y: top + bar + h - 9, w: w * 0.36, h: 5, r: 2.5 };
   }
 
   // volume pair and power, drawn just outside the body edge
@@ -90,6 +105,8 @@ export function phoneGeometry(device, landscape = false) {
     screenX: g.screenY, screenY: g.screenX,
     screenW: g.screenH, screenH: g.screenW,
     cut: t(g.cut),
+    glass: t(g.glass),
+    status: { ...t(g.status), cut: g.status.cut, chin: g.status.chin, landscape },
     home: g.home && { ...t(g.home), type: g.home.type },
     camera: t(g.camera),
     speaker: t(g.speaker),
@@ -156,17 +173,34 @@ export function composePhone({ geom, scale, shot, bg = [12, 12, 12], margin = 3 
   // ---- screen -------------------------------------------------------------
   const sx = bodyX + S(geom.screenX), sy = bodyY + S(geom.screenY);
   const sw = S(geom.screenW), sh = S(geom.screenH);
-  const scx = sx + sw / 2, scy = sy + sh / 2;
-  const sr = S(geom.screenR);
+  // the glass is the rounded shape; the page is a plain rect inside it
+  const gl = geom.glass || { x: geom.screenX, y: geom.screenY, w: geom.screenW, h: geom.screenH, r: geom.screenR };
+  const gx = bodyX + S(gl.x), gy = bodyY + S(gl.y), gw = S(gl.w), gh = S(gl.h);
+  const gcx = gx + gw / 2, gcy = gy + gh / 2, gr = S(gl.r);
 
-  const sx0 = Math.max(0, Math.floor(sx - 1)), sx1 = Math.min(W, Math.ceil(sx + sw + 1));
-  const sy0 = Math.max(0, Math.floor(sy - 1)), sy1 = Math.min(H, Math.ceil(sy + sh + 1));
-
-  for (let py = sy0; py < sy1; py++) {
-    for (let px = sx0; px < sx1; px++) {
-      const d = sdRoundRect(px + 0.5, py + 0.5, scx, scy, sw / 2, sh / 2, sr);
+  // The status bar takes the colour of the top of the page, the way Safari
+  // and Chrome tint it, with dark or light icons to suit.
+  let tint = [0, 0, 0];
+  {
+    let n = 0; const acc = [0, 0, 0];
+    const vertical = !geom.status?.landscape;
+    const edge = vertical ? shot.width : shot.height;
+    for (let k = 0; k < edge; k += 2) for (let j = 0; j < 2; j++) {
+      const ix = vertical ? k : Math.min(shot.width - 1, j), iy = vertical ? Math.min(shot.height - 1, j) : k;
+      const i = (iy * shot.width + ix) * 3;
+      acc[0] += shot.data[i]; acc[1] += shot.data[i + 1]; acc[2] += shot.data[i + 2]; n++;
+    }
+    if (n) tint = acc.map(v => v / n);
+  }
+  const gx0 = Math.max(0, Math.floor(gx - 1)), gx1 = Math.min(W, Math.ceil(gx + gw + 1));
+  const gy0 = Math.max(0, Math.floor(gy - 1)), gy1 = Math.min(H, Math.ceil(gy + gh + 1));
+  const px0 = Math.floor(sx), px1 = Math.ceil(sx + sw), py0 = Math.floor(sy), py1 = Math.ceil(sy + sh);
+  for (let py = gy0; py < gy1; py++) {
+    for (let px = gx0; px < gx1; px++) {
+      const d = sdRoundRect(px + 0.5, py + 0.5, gcx, gcy, gw / 2, gh / 2, gr);
       const a = Math.max(0, Math.min(1, 0.5 - d));
       if (a <= 0) continue;
+      if (px < px0 || px >= px1 || py < py0 || py >= py1) { blend(buf, (py * W + px) * 3, tint[0], tint[1], tint[2], a); continue; }
 
       // sample the screenshot; outside it (rounding slop) fall back to black
       const ix = Math.min(shot.width - 1, Math.max(0, Math.round(px - sx)));
@@ -191,6 +225,46 @@ export function composePhone({ geom, scale, shot, bg = [12, 12, 12], margin = 3 
       }
     }
   };
+
+  // ---- status bar: time, signal, battery ----------------------------------
+  const st = geom.status;
+  if (st && !st.landscape && st.h > 0) {
+    const lumT = 0.2126 * tint[0] + 0.7152 * tint[1] + 0.0722 * tint[2];
+    const ink = lumT > 140 ? 18 : 245;
+    const cy = st.y + Math.min(st.h / 2, 24);
+    const u = st.chin ? 1.2 : 1.7;                 // one font pixel, in logical px
+    const glyphs = {
+      9: ['01110', '10001', '10001', '01111', '00001', '00010', '01100'],
+      4: ['00010', '00110', '01010', '10010', '11111', '00010', '00010'],
+      1: ['00100', '01100', '00100', '00100', '00100', '00100', '01110'],
+      ':': ['0', '0', '1', '0', '1', '0', '0'],
+    };
+    const text = '9:41';
+    const adv = (c) => (glyphs[c][0].length + 1) * u;
+    const textW = [...text].reduce((t, c) => t + adv(c), -u);
+    // half the cutout's width: the time and icons sit centred in the "ears"
+    const ear = st.cut === 'island' ? 51 : st.cut === 'notch' ? 75 : 0;
+    let tx = st.chin ? st.x + st.w / 2 - textW / 2
+      : ear ? st.x + (st.w / 2 - ear) / 2 - textW / 2 + 6
+      : st.x + 18;
+    for (const c of text) {
+      glyphs[c].forEach((bits, ry) => [...bits].forEach((bit, rx) => {
+        if (bit === '1') drawRect({ x: tx + rx * u, y: cy - 3.5 * u + ry * u, w: u + 0.15, h: u + 0.15, r: 0 }, ink, ink, ink);
+      }));
+      tx += adv(c);
+    }
+    // battery on the right, signal bars to its left
+    const bw = st.chin ? 20 : 24, bh = st.chin ? 9 : 11.5;
+    const right = ear ? st.x + st.w - (st.w / 2 - ear) / 2 + 14 : st.x + st.w - 16;
+    const bx = right - bw, by = cy - bh / 2;
+    drawRect({ x: bx, y: by, w: bw, h: bh, r: 3 }, ink, ink, ink, 0.45);
+    drawRect({ x: bx + 1.6, y: by + 1.6, w: (bw - 3.2) * 0.8, h: bh - 3.2, r: 1.6 }, ink, ink, ink);
+    drawRect({ x: bx + bw + 0.8, y: cy - 2, w: 1.6, h: 4, r: 0.8 }, ink, ink, ink, 0.45);
+    for (let k = 0; k < 4; k++) {
+      const hh = bh * (0.35 + 0.22 * k);
+      drawRect({ x: bx - 24 + k * 5, y: by + bh - hh, w: 3.2, h: hh, r: 0.9 }, ink, ink, ink);
+    }
+  }
 
   drawRect(geom.cut, 8, 8, 10);
   drawRect(geom.speaker, 26, 28, 33);
