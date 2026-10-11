@@ -14,10 +14,17 @@ document or an HTML mockup with no dev server at all.
 
 No browser window. No emulator. Nothing to alt-tab to.
 
-## Before you start: one requirement
+## Before you start
 
-**1. A terminal that can split itself.** livepeek doesn't open a window; it asks
-your terminal for a new pane. That means you need one of:
+livepeek needs Node.js 18 or newer, Chrome or Edge, and one browser-driver
+package:
+
+```bash
+npm add --global playwright-core@1.63.0
+```
+
+For the full experience, use a terminal that can split itself. livepeek asks
+the terminal for a new pane. Supported hosts are:
 
 - **tmux**: works on macOS, Linux and Windows. If you're unsure, use this.
 - **Zellij**, **Kitty**, **WezTerm**, or **Windows Terminal**
@@ -32,18 +39,12 @@ Then start Claude Code inside it. (If you're on tmux, also add
 `set -g allow-passthrough on` to your `~/.tmux.conf`; tmux blocks graphics
 sequences without it.)
 
-No multiplexer at all? livepeek still works, it just runs in your current pane
-instead of splitting; see `--here` below.
+No multiplexer at all? livepeek still works. `--here` runs it in your current
+pane, and a terminal that cannot draw images gets the page as text.
 
-Then one package, installed once and never again:
-
-```bash
-npm add --global playwright-core@1.63.0
-```
-
-That is the driver livepeek uses to steer the Chrome or Edge already on your
-machine, headless. livepeek downloads nothing itself. You won't see a browser
-window.
+`playwright-core` is the driver livepeek uses to steer the Chrome or Edge
+already on your machine, headless. livepeek downloads nothing itself. You
+won't see a browser window.
 
 ## Your first run
 
@@ -82,12 +83,19 @@ building: a phone frame around it would misrepresent it.
 
 ## Opening it without Claude
 
-You do not have to be in a Claude session. A one-word `livepeek` command works
-from any shell once you copy a wrapper from the plugin's `bin/` folder onto
-your PATH: `bin/livepeek.cmd` for PowerShell, `bin/livepeek` for Bash and the shells
-inside tmux and Zellij. On Windows, dropping both into a folder that is already on your PATH covers
-every shell at once. After that, `livepeek` in a project folder opens the pane
-and `livepeek --quit` closes it. The README has the exact copy commands.
+You do not have to be in a Claude session. Copy a wrapper from the installed
+plugin cache into a folder on your PATH. With the default Claude configuration,
+version 0.5.0 is under:
+
+```
+~/.claude/plugins/cache/livepeek/livepeek/0.5.0/bin/
+```
+
+On Windows, copy `livepeek.cmd`. On macOS or Linux, copy `livepeek` and make it
+executable. If `CLAUDE_CONFIG_DIR` is set, use that directory instead of
+`~/.claude`. The wrapper finds the newest installed plugin itself, so a copy
+from any installed version keeps working after updates. The README has exact
+commands. After that, `livepeek` opens the pane and `livepeek --quit` closes it.
 
 ## In VS Code
 
@@ -155,13 +163,15 @@ and why.
 
 
 **The view is coloured mush, or garbage characters.** livepeek guessed your
-terminal's graphics support wrong. Press `b` to cycle through the three
-renderers until it looks right.
+terminal's graphics support wrong. Press `b` to cycle through kitty, sixel,
+text and half-blocks until it looks right.
 
-**It's blocky and coarse, but readable.** That's the half-block fallback,
-meaning your terminal reported no graphics support. It works, it's just not
-pretty. Kitty, Ghostty, WezTerm, Windows Terminal 1.22+ and xterm all render
-properly.
+**The pane shows the page as text.** That is the automatic fallback when the
+terminal reports no graphics support. The page stays readable and interactive.
+
+**It's blocky and coarse, but readable.** Half-block mode draws a coarse
+picture. Press `b` to choose another renderer. Kitty, Ghostty, WezTerm,
+Windows Terminal 1.22+ and xterm can draw sharper pictures.
 
 **Nothing renders at all and you're in tmux.** Add this to `~/.tmux.conf` and
 restart tmux:
@@ -212,15 +222,18 @@ pane or a smaller viewport:
 
 | you're building | from | opens on |
 |---|---|---|
-| a website | Next, Nuxt, SvelteKit, Astro, Remix, Gatsby, Docusaurus, Angular, CRA, Vite, Parcel, webpack | 1440×900 desktop |
+| a website | Next, Nuxt, SvelteKit, Astro, Remix, Gatsby, Docusaurus, Angular, CRA, Vite, Parcel, webpack | `fit`: the pane's own size |
 | a game | any of those **plus** Phaser, three, Pixi, Babylon, Excalibur, Kaplay, p5, PlayCanvas | 16:9 720p |
-| a phone app | Expo, React Native | iPhone 15 Pro, with a phone body |
-| a document or mockup | `index.html`, any `.html`, any `.md` (no package.json needed) | desktop, or a 900×1200 page for markdown |
+| a phone app | Expo (React Native through its web build) | iPhone 15 Pro, with a phone body |
+| a document or mockup | `index.html`, any `.html`, any `.md` (no package.json needed) | `fit` |
 | anything else | nothing detected | give it `--url` or `--file` |
 
-33 viewports ship with it: 21 real devices, 6 web breakpoints, 5 game aspect
-ratios, 2 document pages. Press `space` in the pane to see them all, and type
-to filter the list.
+`fit` uses the pane's own pixel size, so text is not scaled down. A fixed size
+such as `desktop` (1440×900) or `document` (900×1200) is one `--preset` away.
+
+34 viewports ship with it: 20 real devices, 7 web sizes including `fit`, 5 game
+aspect ratios and 2 document pages. Press `space` in the pane to see them all,
+and type to filter the list.
 
 ## Options
 
@@ -229,12 +242,18 @@ to filter the list.
 /livepeek:livepeek --url http://localhost:1234     skip detection, point at a server
 /livepeek:livepeek --port 3000                non-default dev server port
 /livepeek:livepeek --size 0.4                 wider pane
+/livepeek:livepeek --interval 200             refresh faster (default 600 ms, more CPU)
+/livepeek:livepeek --render sixel             force kitty, sixel or blocks
 /livepeek:livepeek --horizontal               split below instead of beside
 /livepeek:livepeek --no-serve                 your server is already running
 /livepeek:livepeek --file docs/spec.md        show one file (markdown or html)
+/livepeek:livepeek --snapshot out.png         write what the pane shows to a PNG
+/livepeek:livepeek --eval 'innerWidth'        run a snippet in the shown page
 /livepeek:livepeek --here                     run in this pane, don't split
 /livepeek:livepeek --new                      force a second pane instead of reusing
 /livepeek:livepeek --quit                     close the open pane cleanly
+/livepeek:livepeek --compare desktop,iphone-15-pro   two panes, one per preset
+/livepeek:livepeek --doctor                   check the installation and terminal
 /livepeek:livepeek --dry-run                  show what it would do, then stop
 ```
 

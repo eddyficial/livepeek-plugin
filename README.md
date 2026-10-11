@@ -62,26 +62,39 @@ downloaded Chromium, that is used instead.
 
 ## Open it from any shell
 
-`/livepeek:livepeek` inside Claude Code is one way in. The other is a plain `livepeek` command
-in whatever shell you are in, no Claude session needed. Two tiny wrappers in
-[`bin/`](bin/) find the newest installed copy of the plugin, so they never go
-stale after an update:
+Inside Claude Code, `/livepeek:livepeek` is one way in. The Bash tool can also
+run `livepeek` directly while the plugin is enabled because the plugin's
+top-level `bin/` is on its PATH.
 
-- `bin/livepeek` for Bash, Zsh and the shell inside tmux or Zellij
-- `bin/livepeek.cmd` for PowerShell and cmd on Windows
-
-Copy whichever you need into any folder that is already on your PATH:
+For PowerShell, cmd, or shells outside Claude Code, copy a wrapper from the
+installed plugin cache into a folder on your PATH. With the default Claude
+configuration, the v0.5.0 wrappers are here:
 
 ```
-copy bin\livepeek.cmd <that folder>
-copy bin\livepeek     <that folder>
+~/.claude/plugins/cache/livepeek/livepeek/0.5.0/bin/
 ```
 
-On macOS and Linux, `/usr/local/bin` or `~/.local/bin`:
+These examples use `$HOME\bin` on Windows and `~/.local/bin` on macOS and
+Linux. Add that folder to your PATH if it is not already there.
 
+Windows PowerShell:
+
+```powershell
+New-Item -ItemType Directory -Force "$HOME\bin" | Out-Null
+Copy-Item "$HOME\.claude\plugins\cache\livepeek\livepeek\0.5.0\bin\livepeek.cmd" "$HOME\bin\livepeek.cmd"
 ```
-cp bin/livepeek ~/.local/bin/livepeek && chmod +x ~/.local/bin/livepeek
+
+macOS or Linux:
+
+```bash
+mkdir -p ~/.local/bin
+cp ~/.claude/plugins/cache/livepeek/livepeek/0.5.0/bin/livepeek ~/.local/bin/livepeek
+chmod +x ~/.local/bin/livepeek
 ```
+
+If `CLAUDE_CONFIG_DIR` is set, use it instead of `~/.claude`. Each wrapper
+looks up the newest installed plugin when it runs, so a copy from any installed
+version keeps working after updates.
 
 Then, from any project folder:
 
@@ -342,7 +355,7 @@ scripts/
   lib/driver.mjs  finds playwright-core (global, project, or full playwright)
   lib/caps.mjs    terminal capability probe, renderer choice
   lib/png.mjs     PNG decoder (zlib + scanline unfilter)
-  lib/sixel.mjs   sixel encoder, plus the half-block fallback
+  lib/sixel.mjs   sixel encoder, plus the optional half-block renderer
   lib/kitty.mjs   kitty graphics encoder, tmux passthrough
   lib/phone.mjs   phone body geometry and compositing
   lib/bare.mjs    frameless compositing, for web, games and documents

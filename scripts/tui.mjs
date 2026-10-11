@@ -8,10 +8,10 @@
  *
  * The renderer is probed, not assumed: kitty graphics where available (Kitty,
  * Ghostty, WezTerm), sixel otherwise (Windows Terminal >= 1.22, xterm, foot),
- * and half-blocks on anything that answers neither. 'b' overrides the guess.
+ * and readable text on anything that answers neither. 'b' cycles every mode.
  *
  * Input goes through to the page: click and scroll always, and every keystroke
- * in typing mode ('i'). 't' switches which project is being viewed, and a new
+ * in typing mode ('i'). 'p' switches which project is being viewed, and a new
  * launch elsewhere retargets this pane rather than opening another one.
  *
  *   node tui.mjs [--target http://localhost:5173] [--preset desktop]
@@ -139,23 +139,14 @@ const vp = () => {
  * which has no substitute, and a *browser binary*, which does - see
  * findSystemBrowser below. This resolves the first.
  *
- * Search order puts the user's own project first so a project that pins a
- * playwright version gets that version, then the directory this script lives
- * in so the plugin can ship its own, then the global install.
+ * Search order is the current project, this script's directory, the plugin
+ * root when provided, then configured and common global npm locations.
+ * Full playwright, playwright-core and patchright are accepted.
  */
 function resolveChromium() {
   return findDriver(__dirname)?.chromium ?? null;
 }
 
-/**
- * First run on a machine: fetch playwright-core into the plugin's own
- * directory, once, so no project ever needs it as a dependency.
- *
- * It is ~3 MB of JavaScript and downloads no browser - the Chrome or Edge
- * already installed is driven instead. This runs inside the pane, so the
- * user sees a one-line status rather than a stack trace, and a document
- * folder with no package.json works exactly like a Vite project does.
- */
 // livepeek downloads nothing at run time. The browser driver is one npm package,
 // installed once by the user; the message says exactly which command.
 export const DRIVER_HINT =

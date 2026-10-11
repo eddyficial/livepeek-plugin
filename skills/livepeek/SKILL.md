@@ -1,7 +1,7 @@
 ---
 name: livepeek
 description: Open a live view of whatever the user is building - a website, a game, a phone app, a document, a mockup - in a split terminal pane, and look at it yourself after making changes. Use when the user says "/livepeek:livepeek", "show me", "open the preview", "let me see it", "start the emulator", "view the site", "preview this file", or asks to watch what they are building while they edit. Also use after editing UI, game or document files to verify the change visually, and for "the preview is blank / looks wrong".
-version: 0.4.0
+version: 0.5.0
 ---
 
 # livepeek: a live viewing portal in the terminal
@@ -22,9 +22,23 @@ once (`npm add --global playwright-core@1.63.0`). livepeek downloads nothing its
 
 ## Launching it
 
+Run this through the Bash tool. Claude Code puts the plugin's top-level `bin/`
+on that tool's PATH while the plugin is enabled:
+
 ```bash
 livepeek
 ```
+
+Do not assume the command is on the PowerShell tool's PATH. If `livepeek` is
+not found, run this instead, with the same arguments:
+
+```bash
+node "${CLAUDE_PLUGIN_ROOT}/scripts/pane.mjs"
+```
+
+That plugin-root path is substituted into this skill when it loads. It is not
+a shell environment variable. In every command below, use the `node` form in
+place of `livepeek` if the wrapper is unavailable.
 
 Self-contained: it finds the project root, works out which framework it is,
 starts the dev server if the port is dead, detects the terminal, and splits
@@ -41,6 +55,8 @@ Options, added when the user asks:
 | `--url http://...` | point at a server directly, skipping all detection |
 | `--port 3000` | dev server is on a non-default port |
 | `--size 0.4` | wider pane (fraction of the window) |
+| `--interval 200` | refresh faster (default 600 ms, more CPU) |
+| `--render sixel` | force `kitty`, `sixel` or `blocks` |
 | `--horizontal` | split below instead of beside |
 | `--no-serve` | don't start a server, one is already running |
 | `--here` | run in the current pane instead of splitting |
@@ -98,10 +114,10 @@ Terminal keep the dead pane on screen. Use `--quit`, or tell the user to press
 
 | project | port | opens on |
 |---|---|---|
-| a folder with `index.html`, a `.html` file, or a `.md` file (no package.json needed) | built-in | `desktop` for HTML, `document` (900×1200 page) for markdown |
-| Expo / React Native | 8081 | `iphone-15-pro`, with a phone body drawn around it |
-| Next, Nuxt, SvelteKit, Astro, Remix, Gatsby, Docusaurus, Angular, CRA | varies | `desktop` (1440×900), no bezel |
-| Vite, Parcel, webpack-dev-server | varies | `desktop` |
+| a folder with `index.html`, a `.html` file, or a `.md` file (no package.json needed) | built-in | `fit`: the pane's own size |
+| Expo (React Native through its web build) | 8081 | `iphone-15-pro`, with a phone body drawn around it |
+| Next, Nuxt, SvelteKit, Astro, Remix, Gatsby, Docusaurus, Angular, CRA | varies | `fit`, no bezel |
+| Vite, Parcel, webpack-dev-server | varies | `fit` |
 | any of the above **plus** a canvas library (Phaser, three, Pixi, Babylon, Excalibur, Kaplay, p5, PlayCanvas) | varies | `game-720p` (16:9), no bezel |
 
 Phone presets get a phone body with bezel and camera cutout. Web, game and
@@ -109,9 +125,10 @@ document presets are drawn bare: a browser viewport or a game canvas *is* the th
 being built, so a phone frame around it would misrepresent it.
 
 If the user wants a different shape, `--preset` accepts phones, tablets, web
-breakpoints (`desktop`, `desktop-wide`, `laptop`, `laptop-small`,
-`tablet-web`, `mobile-web`) and game aspect ratios (`game-720p`,
-`game-1080p`, `game-4-3`, `game-square`, `game-portrait`).
+sizes (`fit`, `desktop`, `desktop-wide`, `laptop`, `laptop-small`,
+`tablet-web`, `mobile-web`), document pages (`document`, `document-wide`) and
+game aspect ratios (`game-720p`, `game-1080p`, `game-4-3`, `game-square`,
+`game-portrait`).
 
 ## Exit codes mean specific things
 
@@ -170,15 +187,16 @@ press `e` to read the messages.
 The renderer is probed at startup and the footer names which one is active.
 
 - **Coloured mush or garbage characters**: the probe guessed wrong. Tell the
-  user to press `b` to cycle kitty graphics → sixel → half-blocks.
-- **Blocky but legible**: that's the half-block fallback, meaning the
-  terminal reported neither kitty graphics nor sixel. It works, it's just
-  coarse. Kitty, Ghostty, WezTerm, Windows Terminal 1.22+ and xterm do better.
+  user to press `b` to cycle kitty graphics → sixel → text → half-blocks.
+- **Blocky but legible**: half-block mode draws a coarse picture. Press `b` to
+  choose another renderer. Kitty, Ghostty, WezTerm, Windows Terminal 1.22+
+  and xterm can draw sharper pictures.
 - **Blank page**: the server is up but serving nothing useful. For Expo it's
   usually the missing web deps above. Check the URL directly first.
-- **The pane shows the page as text, footer says `text`**: the host draws
-  no graphics (Zellij on Windows does this), so livepeek renders the DOM as
-  readable text: headings, paragraphs, links, buttons, inputs. Clicks and
+- **The pane shows the page as text, footer says `text`**: this is the automatic
+  fallback when the host draws no graphics (Zellij on Windows does this), so
+  livepeek renders the DOM as readable text: headings, paragraphs, links,
+  buttons, inputs. Clicks and
   scrolling still work; `--snapshot` still writes the real pixels. This is
   expected there. For a sharp picture, run livepeek from a Windows Terminal pane
   instead of inside Zellij.
