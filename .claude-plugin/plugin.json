@@ -6,8 +6,8 @@
   "author": {
     "name": "eddyficial"
   },
-  "homepage": "https://github.com/eddyficial/livepeek",
-  "repository": "https://github.com/eddyficial/livepeek",
+  "homepage": "https://github.com/eddyficial/livepeek-plugin",
+  "repository": "https://github.com/eddyficial/livepeek-plugin",
   "license": "MIT",
   "keywords": [
     "preview", "terminal", "live-reload", "sixel", "kitty-graphics",

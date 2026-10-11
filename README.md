@@ -51,7 +51,7 @@ If you point livepeek at a Vite, Next or Expo project, that project's dependenci
 ## Install
 
 ```
-/plugin marketplace add eddyficial/livepeek
+/plugin marketplace add eddyficial/livepeek-plugin
 /plugin install livepeek@livepeek
 ```
 
