@@ -1223,25 +1223,63 @@ let welcomeImg = null;          // { key, img } decoded at the current pane size
 const WELCOME_HTML = `<!doctype html><html><head><meta charset="utf-8"><style>
 *{box-sizing:border-box;margin:0}
 html,body{height:100%}
-body{background:#14161b;color:#d4d7de;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;
-  display:flex;flex-direction:column;padding:clamp(10px,3.5vw,28px);font-size:clamp(13px,3.6vw,19px);line-height:1.45}
-.pick{display:flex;gap:.7em;align-items:flex-start;color:#7cc4ff}
-.arrow{font-size:2.6em;line-height:.8;font-weight:300}
-.pick b{display:block;font-size:1.15em;color:#a9d8ff}
-.chips{display:flex;flex-wrap:wrap;gap:.35em;margin-top:.45em}
-.chips span{border:1px solid #2f4a63;background:#182533;color:#9cc9ef;border-radius:999px;padding:.05em .7em;font-size:.82em}
-main{flex:1;display:flex;flex-direction:column;justify-content:center;gap:.8em;max-width:34em}
-h1{font-size:1.75em;line-height:1.15;color:#fff;font-weight:650}
-p{color:#aab0bc}
-kbd{font-family:inherit;border:1px solid #3a3f4a;border-bottom-width:2px;border-radius:5px;padding:0 .35em;font-size:.85em;color:#d4d7de}
-.go{align-self:flex-start;margin-top:.4em;background:#2563eb;color:#fff;border-radius:999px;padding:.45em 1.1em;font-size:.9em;font-weight:600}
+body{color:#d4d7de;font-family:'Segoe UI',system-ui,-apple-system,sans-serif;overflow:hidden;
+  background:radial-gradient(120% 70% at 20% -10%,#24344a 0%,#151a23 45%,#0b0d11 100%);
+  display:flex;flex-direction:column;padding:clamp(10px,3.5vw,28px);font-size:clamp(13px,3.4vw,18px);line-height:1.45}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;box-shadow:inset 0 0 12vmin rgba(0,0,0,.55)}
+.pick{position:relative;align-self:flex-start;display:flex;gap:.6em;align-items:center;padding:.5em .95em .5em .6em;
+  border-radius:.8em;background:linear-gradient(180deg,rgba(60,90,130,.55),rgba(25,38,56,.75));
+  border:1px solid rgba(140,190,240,.35);box-shadow:0 .5em 1.4em rgba(0,0,0,.5),inset 0 1px 0 rgba(255,255,255,.18)}
+.pick::before{content:'';position:absolute;left:1.05em;top:-.42em;width:.8em;height:.8em;transform:rotate(45deg);
+  background:#3a5677;border-left:1px solid rgba(140,190,240,.35);border-top:1px solid rgba(140,190,240,.35)}
+.pick .ar{width:1.5em;height:1.5em;border-radius:50%;display:grid;place-items:center;color:#0b1a2b;font-weight:800;
+  background:radial-gradient(circle at 35% 30%,#d6ecff,#6fb6f5 60%,#3b82c4);box-shadow:0 2px 5px rgba(0,0,0,.45)}
+.pick b{color:#e6f2ff;font-weight:600;font-size:.95em}
+.body{flex:1;display:flex;flex-direction:column;min-height:0}
+.stage{flex:1;display:flex;align-items:center;justify-content:center;min-height:0;padding:1em 0 1.6em}
+.rig{position:relative;display:flex;align-items:flex-end}
+.rig::after{content:'';position:absolute;left:-14%;right:-6%;bottom:-12%;height:14%;border-radius:50%;
+  background:radial-gradient(closest-side,rgba(0,0,0,.6),transparent);filter:blur(4px)}
+.dev{position:relative;z-index:1;background:linear-gradient(145deg,#3b3f47,#15171b 55%,#2a2d33);
+  box-shadow:0 1.2em 2em rgba(0,0,0,.55),inset 0 0 0 1px rgba(255,255,255,.12),inset 0 1px 1px rgba(255,255,255,.25)}
+.scr{position:absolute;overflow:hidden;background:#f4f6fa}
+.scr::after{content:'';position:absolute;inset:0;background:linear-gradient(115deg,rgba(255,255,255,.35) 0%,rgba(255,255,255,.06) 32%,transparent 33%)}
+.scr i{display:block;margin:7% 8% 0;height:6%;border-radius:2px;background:#d7dce5}
+.scr .hero{margin:0;height:34%;border-radius:0;background:linear-gradient(135deg,#4f7cff,#9b5cff 60%,#ff7aa8)}
+.scr .w6{width:55%} .scr .w8{width:72%}
+.scr .card{height:18%;background:#e3e7ef;border-radius:4px}
+.laptop{width:min(50vw,38vh);height:calc(min(50vw,38vh)*.64);border-radius:3% 3% 0 0}
+.laptop .scr{inset:4% 3.5% 6%;border-radius:2px}
+.laptop::after{content:'';position:absolute;left:-9%;right:-9%;bottom:-6%;height:6%;border-radius:0 0 40% 40%/0 0 100% 100%;
+  background:linear-gradient(180deg,#c9ced6,#7d838c 60%,#4a4e55);box-shadow:0 .4em .8em rgba(0,0,0,.5)}
+.tablet{width:min(25vw,20vh);height:calc(min(25vw,20vh)*1.36);border-radius:8%/6%;margin-left:-4%;margin-bottom:-1%}
+.tablet .scr{inset:5% 6%;border-radius:3%/2%}
+.phone{width:min(12.5vw,10vh);height:calc(min(12.5vw,10vh)*2.05);border-radius:18%/9%;margin-left:-3%;margin-bottom:-1.5%}
+.phone .scr{inset:4% 5.5%;border-radius:14%/7%}
+.phone .scr::before{content:'';position:absolute;z-index:2;top:2.5%;left:34%;right:34%;height:4.5%;border-radius:99px;background:#0b0c0f}
+main{display:flex;flex-direction:column;gap:.55em;max-width:34em;position:relative;z-index:1}
+h1{font-size:1.75em;line-height:1.12;font-weight:700;letter-spacing:-.01em;
+  background:linear-gradient(180deg,#ffffff,#b9c6d8);-webkit-background-clip:text;color:transparent}
+p{color:#a9b1be}
+kbd{font-family:inherit;font-size:.8em;color:#e8ebf0;padding:.05em .45em .12em;border-radius:.35em;
+  background:linear-gradient(180deg,#4a505b,#2b2f37);border:1px solid #1a1d22;
+  box-shadow:0 2px 0 #121418,inset 0 1px 0 rgba(255,255,255,.2)}
+.go{align-self:flex-start;margin-top:.35em;padding:.5em 1.25em;border-radius:999px;font-size:.92em;font-weight:600;color:#fff;
+  background:linear-gradient(180deg,#5b93ff,#2563eb 55%,#1d4fc4);border:1px solid #1a3f9a;
+  box-shadow:0 .5em 1.1em rgba(37,99,235,.45),inset 0 1px 0 rgba(255,255,255,.4),inset 0 -2px 0 rgba(0,0,0,.2)}
+@media (min-aspect-ratio:3/2){.body{flex-direction:row-reverse;align-items:center;gap:4vw}.stage{padding:0}main{flex:0 1 26em}
+.laptop{width:min(34vw,52vh);height:calc(min(34vw,52vh)*.64)}.tablet{width:min(17.5vw,27vh);height:calc(min(17.5vw,27vh)*1.36)}.phone{width:min(8.8vw,13.5vh);height:calc(min(8.8vw,13.5vh)*2.05)}}
 </style></head><body>
-<div class="pick"><div class="arrow">&#8593;</div><div><b>Pick a device up here</b>
-<div class="chips"><span>phone</span><span>tablet</span><span>desktop</span></div></div></div>
+<div class="pick"><div class="ar">&#8593;</div><b>Pick a device up here</b></div>
+<div class="body"><div class="stage"><div class="rig">
+ <div class="dev laptop"><div class="scr"><i class="hero"></i><i class="w8"></i><i class="w6"></i><i class="card"></i></div></div>
+ <div class="dev tablet"><div class="scr"><i class="hero"></i><i class="w8"></i><i class="w6"></i><i class="card"></i></div></div>
+ <div class="dev phone"><div class="scr"><i class="hero"></i><i class="w8"></i><i class="w6"></i><i class="card"></i></div></div>
+</div></div>
 <main><h1>Welcome to livepeek</h1>
 <p>This pane shows your project, live. Save a file and it updates here.</p>
 <p>Click and scroll go to the page. <kbd>space</kbd> opens the device list, <kbd>shift</kbd>+<kbd>?</kbd> lists every key.</p>
-<div class="go">Click anywhere to start</div></main>
+<div class="go">Click anywhere to start</div></main></div>
 </body></html>`;
 
 /** The whole area below the header, rather than the device's aspect ratio. */
