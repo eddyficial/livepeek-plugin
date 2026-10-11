@@ -82,8 +82,13 @@ await test('--new gives the extra pane a slot of its own', () => {
   const dir = tmpdir('slots-new');
   fs.writeFileSync(path.join(dir, 'index.html'), '<h1>x</h1>');
   const slotOf = (args) => {
+    // --dry-run only prints the pane command when there is a host to split;
+    // CI runners have none, so pretend to be inside Windows Terminal
+    // (nothing is launched, the command is only printed).
+    const env = { ...process.env, HOME, USERPROFILE: HOME, LIVEPEEK_SLOT: 'mine', WT_SESSION: '00000000-0000-0000-0000-000000000001' };
+    for (const k of ['TMUX', 'ZELLIJ', 'KITTY_WINDOW_ID', 'WEZTERM_PANE', 'TERM_PROGRAM']) delete env[k];
     const r = spawnSync(process.execPath, [path.join(SCRIPTS, 'pane.mjs'), '--dry-run', ...args], {
-      cwd: dir, encoding: 'utf8', env: { ...process.env, HOME, USERPROFILE: HOME, LIVEPEEK_SLOT: 'mine' } });
+      cwd: dir, encoding: 'utf8', env });
     return (r.stdout.match(/--slot (\S+)/) || [])[1];
   };
   const mine = session.slotFromEnv({ LIVEPEEK_SLOT: 'mine' });
