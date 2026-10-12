@@ -32,7 +32,7 @@ import { toKitty, tmuxWrap, kittyClearAll } from './lib/kitty.mjs';
 import { probeTerminal, pickRenderer } from './lib/caps.mjs';
 import * as session from './lib/session.mjs';
 import { gateLanRequest, serveStatic } from './lib/serve.mjs';
-import { startManagedDevServer, stopManagedDevServer } from './lib/devserver.mjs';
+import { servesOtherProject, startManagedDevServer, stopManagedDevServer } from './lib/devserver.mjs';
 import * as projects from './lib/projects.mjs';
 import * as intro from './lib/intro.mjs';
 import { menuHtml, iconOf, HEAD_ROWS, ROW_H, FOOT_ROWS } from './lib/menuview.mjs';
@@ -340,8 +340,9 @@ async function ensureServer() {
     currentTarget = `http://localhost:${port}/`;
     return;
   }
-  if (!SERVE || !SERVE_PORT || await portOpen(SERVE_PORT)) return;
-  await startDevServer(SERVE, SERVE_CWD, SERVE_PORT);
+  if (!SERVE || !SERVE_PORT || await serverUpFor(SERVE_PORT, SERVE_CWD)) return;
+  const up = await startDevServer(SERVE, SERVE_CWD, SERVE_PORT);
+  if (up && up !== SERVE_PORT) currentTarget = withPort(currentTarget, up);
 }
 
 /**
@@ -365,10 +366,28 @@ async function serveFolder(opts) {
   return r;
 }
 
-/** Run `npm run <script>` in cwd and wait for its port. Resolves true when up. */
+/**
+ * Something is on the port and it is not known to be another project's dev
+ * server. Without the second check a project whose port is only a guess
+ * (Vite's 5173) shows whichever other project happens to be sitting there.
+ */
+async function serverUpFor(port, cwd) {
+  return await portOpen(port) && !(cwd && await servesOtherProject(port, path.resolve(cwd)));
+}
+
+/** Point a URL at another port, keeping its host and path. */
+function withPort(url, port) {
+  try { const u = new URL(url); u.port = String(port); return u.href; } catch { return url; }
+}
+
+/**
+ * Run `npm run <script>` in cwd and wait for its server. Resolves with the
+ * port it is up on - not always the one asked for, since Vite moves to the
+ * next free port when its own is taken - or 0 when it failed.
+ */
 async function startDevServer(script, cwd, port) {
   const key = `${path.resolve(cwd)}\0${script}\0${port}`;
-  if (devServer && devServerKey === key && devServer.exitCode === null && await portOpen(port)) return true;
+  if (devServer && devServerKey === key && devServer.exitCode === null && await portOpen(devServerPort)) return devServerPort;
   statusMsg = 'starting dev server';
   drawFooter(lastLayout || layout());
   const stoppedPort = stopDevServer();
@@ -378,16 +397,18 @@ async function startDevServer(script, cwd, port) {
       await new Promise(resolve => setTimeout(resolve, 50));
     }
   }
-  if (await portOpen(port)) return true;
+  if (await serverUpFor(port, cwd)) return port;
+  // readiness uses the same test: until Vite prints the port it moved to, the
+  // guessed one may answer - from the other project that made it move
   const r = await startManagedDevServer({
-    script, cwd, port, portOpen,
+    script, cwd, port, portOpen: p => serverUpFor(p, cwd),
     maxStatusLength: Math.max(40, (lastLayout || layout()).cols - 2),
   });
   devServer = r.child;
   devServerKey = r.child ? key : null;
-  devServerPort = r.child ? port : null;
+  devServerPort = r.child ? (r.port ?? port) : null;
   if (!r.ok) statusMsg = r.message;
-  return r.ok;
+  return r.ok ? (r.port ?? port) : 0;
 }
 
 function stopDevServer() {
@@ -544,7 +565,8 @@ async function applyControl(s) {
   }
 
   if (s.serve && s.serve.port) {
-    await startDevServer(s.serve.script, s.serve.cwd, s.serve.port);
+    const up = await startDevServer(s.serve.script, s.serve.cwd, s.serve.port);
+    if (up && up !== s.serve.port && s.target) s.target = withPort(s.target, up);
   }
   if (s.serve) publish({ serve: null });
   if (s.watch) { watchFolder(s.watch); publish({ watch: null }); }
@@ -1011,10 +1033,13 @@ async function menuSelect(pos) {
     } else {
       shownDir = null;
       if (t.script && t.port) {
-        const ok = await startDevServer(t.script, t.dir, t.port);
-        if (!ok) return tick(true);
-      } else if (t.url !== currentTarget) stopDevServer();
-      currentTarget = t.url;
+        const up = await startDevServer(t.script, t.dir, t.port);
+        if (!up) return tick(true);
+        currentTarget = up === t.port ? t.url : withPort(t.url, up);
+      } else {
+        if (t.url !== currentTarget) stopDevServer();
+        currentTarget = t.url;
+      }
     }
     publish();
     const pi = devices.findIndex(d => d.id === t.preset);

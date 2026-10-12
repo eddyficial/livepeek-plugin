@@ -148,10 +148,13 @@ Terminal keep the dead pane on screen. Use `--quit`, or tell the user to press
 | Vite, Parcel, webpack-dev-server | varies | `fit` |
 | any of the above **plus** a canvas library (Phaser, three, Pixi, Babylon, Excalibur, Kaplay, p5, PlayCanvas) | varies | `game-720p` (16:9), no bezel |
 
-The port comes from, in order: a `--port` flag in the dev script, the
-`server.port` (Nuxt: `devServer.port`) in a Vite, SvelteKit, Astro or Nuxt
-config file, the port the project was last shown on, then the framework
-default. If the pane is blank, check the project actually listens there.
+The port comes from, in order: a `--port` flag in the dev script (or a
+script it runs, such as `npm:dev:web`), `server.port` (Nuxt:
+`devServer.port`) in a Vite, SvelteKit, Astro or Nuxt config file, the port
+the project was last shown on, then the framework default. A Vite server on
+that port that belongs to another project is recognised and skipped; when the
+pane starts the dev server it follows the `Local:` address the server prints,
+so a Vite that moved to the next free port is still found.
 
 Phone presets get a phone body with bezel and camera cutout. Web, game and
 document presets are drawn bare: a browser viewport or a game canvas *is* the thing

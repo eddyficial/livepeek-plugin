@@ -310,3 +310,47 @@ await test('detectFramework takes the port from the script, then the config, the
   fw = detectFramework(pkg, tmpdir('fw-no-config'));
   eq([fw.port, fw.portFrom], [5173, 'default'], 'default without a config');
 });
+
+await test('portFromScript follows npm:x and npm run x, but only into framework scripts', async () => {
+  const { portFromScript } = await import(pathToFileURL(path.join(SCRIPTS, 'targets.mjs')).href);
+  const scripts = {
+    dev: 'concurrently "npm:dev:api" "npm:dev:web"',
+    'dev:api': 'PORT=4000 node server.js',
+    'dev:web': 'vite --port 5280',
+    start: 'npm run dev:web',
+    loop: 'npm run loop',
+  };
+  eq(portFromScript(scripts, 'dev'), 5280, 'concurrently npm: refs');
+  eq(portFromScript(scripts, 'start'), 5280, 'npm run ref');
+  eq(portFromScript({ dev: 'npm:dev:api', 'dev:api': 'PORT=4000 node s.js' }, 'dev'), null, 'API port ignored');
+  eq(portFromScript(scripts, 'loop'), null, 'self reference');
+  eq(portFromScript({ dev: 'next dev -p 3100' }, 'dev'), 3100, 'own flag');
+});
+
+await test('announcedPort reads the Local: address a dev server prints', async () => {
+  const { announcedPort } = await lib('devserver.mjs');
+  eq(announcedPort('  \x1b[32m➜\x1b[39m  \x1b[1mLocal\x1b[22m:   \x1b[36mhttp://localhost:\x1b[1m5174\x1b[22m/\x1b[39m'), 5174, 'vite, coloured');
+  eq(announcedPort('[web]   ➜  Local:   http://localhost:5280/'), 5280, 'concurrently prefix');
+  eq(announcedPort('   - Local:        http://localhost:3001'), 3001, 'next');
+  eq(announcedPort('{"msg":"Server listening at http://127.0.0.1:5281"}'), null, 'API log line');
+  eq(announcedPort('  ➜  Network: http://192.168.1.4:5173/'), null, 'network address');
+});
+
+await test('servesOtherProject spots another project\'s Vite by its 403', async () => {
+  const { servesOtherProject } = await lib('devserver.mjs');
+  const seen = [];
+  const server = http.createServer((req, res) => {
+    seen.push(decodeURI(req.url));
+    if (req.url.includes('mine')) { res.end('{}'); return; }
+    res.statusCode = 403;
+    res.end('<p>The request id "x" is outside of Vite serving allow list.</p>');
+  });
+  await new Promise(r => server.listen(0, 'localhost', () => r(null)));
+  const { port } = /** @type {import('node:net').AddressInfo} */ (server.address());
+  try {
+    eq(await servesOtherProject(port, path.join(TMP, 'other proj')), true, 'foreign 403');
+    eq(await servesOtherProject(port, path.join(TMP, 'mine')), false, 'own 200');
+    assert(seen[0].startsWith('/@fs/') && seen[0].endsWith('/other proj/package.json') && !seen[0].includes('\\'), 'bad probe path ' + seen[0]);
+  } finally { server.close(); }
+  eq(await servesOtherProject(port, TMP), false, 'nothing listening');
+});

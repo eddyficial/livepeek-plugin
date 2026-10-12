@@ -61,12 +61,39 @@ const FRAMEWORKS = [
  * framework default instead is worse than failing: another project may well
  * be sitting on that default, so you would quietly preview the wrong app.
  */
-function portFromScript(cmd) {
+function portFlag(cmd) {
   if (!cmd) return null;
   const m = cmd.match(/--port[= ]\s*(\d{2,5})/)
          || cmd.match(/\bPORT=(\d{2,5})/)
          || cmd.match(/\s-p\s+(\d{2,5})\b/);
   return m ? parseInt(m[1], 10) : null;
+}
+
+// The command each framework's dev server runs as, to tell its script apart
+// from an API server started next to it.
+const CLI = /\b(vite|next|nuxt|nuxi|astro|remix|gatsby|docusaurus|ng|react-scripts|parcel|webpack(-dev-server)?|expo|svelte-kit)\b/;
+
+/**
+ * The port flag in a dev script, following the scripts it runs:
+ * `concurrently "npm:dev:api" "npm:dev:web"` or `npm run dev:web`. A referenced
+ * script only counts if it runs the framework itself, so `PORT=4000` on the
+ * API server is never taken for the page.
+ */
+export function portFromScript(scripts, name, depth = 0) {
+  const cmd = scripts[name];
+  if (!cmd) return null;
+  if (depth === 0 || CLI.test(cmd)) {
+    const own = portFlag(cmd);
+    if (own != null) return own;
+  }
+  if (depth >= 2) return null;
+  const refs = /(?:\bnpm:|\bnpm run |\bpnpm (?:run )?|\byarn (?:run )?)([\w:.-]+)/g;
+  for (const [, ref] of cmd.matchAll(refs)) {
+    if (ref === name || !scripts[ref]) continue;
+    const p = portFromScript(scripts, ref, depth + 1);
+    if (p != null) return p;
+  }
+  return null;
 }
 
 /**
@@ -155,7 +182,7 @@ export function detectFramework(pkg, dir) {
 
   // A flag on the command line beats the config file, as it does when the
   // dev server itself starts.
-  const fromScript = portFromScript(scripts[script]);
+  const fromScript = portFromScript(scripts, script);
   const fromConfig = fromScript == null ? portFromConfigFiles(dir, hit.config) : null;
   /** @type {'script'|'config'|'default'} */
   const portFrom = fromScript != null ? 'script' : fromConfig != null ? 'config' : 'default';
