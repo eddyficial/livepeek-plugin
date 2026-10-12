@@ -110,6 +110,60 @@ await test('browser: title, live reload, screenshot', async () => {
   }
 });
 
+await test('browser: fixed header is settled before screenshots after wheel input', async () => {
+  const exes = browserCandidates();
+  if (!exes.length) return { skip: 'no Chromium found; set LIVEPEEK_BROWSER' };
+  const chromium = findPlaywright();
+  if (!chromium) return { skip: 'playwright-core not resolvable' };
+  const { createFrameSettler } = await lib('frame.mjs');
+  const { decodePng } = await lib('png.mjs');
+
+  let browser = null, lastErr = null;
+  const configured = process.env.LIVEPEEK_BROWSER
+    || process.env.PEEK_BROWSER;
+  for (const exe of configured ? exes.slice(0, 1) : exes) {
+    try {
+      browser = await chromium.launch({
+        headless: true, executablePath: exe, env: REAL_ENV, args: ['--no-sandbox', '--disable-dev-shm-usage'],
+      });
+      break;
+    } catch (e) { lastErr = e; }
+  }
+  if (!browser) {
+    if (configured) throw lastErr;
+    return { skip: 'no browser could be launched: ' + String(lastErr?.message || lastErr).split('\n')[0] };
+  }
+  try {
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2 });
+    const page = await context.newPage();
+    await page.setContent(`<!doctype html><style>
+      html, body { margin: 0; background: white; }
+      body { height: 4000px; }
+      header { position: fixed; inset: 0 0 auto; height: 60px; background: rgb(255, 0, 0); }
+    </style><header></header>`);
+    await page.mouse.move(195, 422);
+    const settle = createFrameSettler();
+
+    for (const dy of [120, 120, -120, 120, -120, -120]) {
+      await page.mouse.wheel(0, dy);
+      await settle(page);
+      const shot = decodePng(await page.screenshot({ type: 'png' }));
+      const x = Math.floor(shot.width / 2);
+      let firstRed = -1;
+      for (let y = 0; y < shot.height; y++) {
+        const p = (y * shot.width + x) * 3;
+        if (shot.data[p] > 240 && shot.data[p + 1] < 20 && shot.data[p + 2] < 20) {
+          firstRed = y;
+          break;
+        }
+      }
+      eq(firstRed, 0, `fixed header after wheel ${dy}`);
+    }
+  } finally {
+    await browser.close().catch(() => {});
+  }
+});
+
 await test('browser: textview EXTRACT finds blocks, links, buttons, inputs', async () => {
   const exes = browserCandidates();
   if (!exes.length) return { skip: 'no Chromium found; set LIVEPEEK_BROWSER' };

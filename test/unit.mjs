@@ -6,6 +6,24 @@ import { HOME, TMP, lib, tmpdir, test, eq, assert, serve, httpGetRaw } from './h
 
 const ESC = '\x1b';
 
+await test('frame settler bounds a hung evaluate and keeps only one in flight', async () => {
+  const { createFrameSettler } = await lib('frame.mjs');
+  const settle = createFrameSettler(30);
+  let calls = 0;
+  const page = { evaluate() { calls++; return new Promise(() => {}); } };
+
+  const started = Date.now();
+  await settle(page);
+  const firstElapsed = Date.now() - started;
+  assert(firstElapsed >= 15 && firstElapsed < 300, `first settle took ${firstElapsed}ms`);
+
+  const secondStarted = Date.now();
+  await settle(page);
+  const secondElapsed = Date.now() - secondStarted;
+  assert(secondElapsed >= 15 && secondElapsed < 300, `second settle took ${secondElapsed}ms`);
+  eq(calls, 1, 'evaluate calls while the first is still pending');
+});
+
 await test('qr chooses the smallest fitting version and draws three finders', async () => {
   const { qrMatrix } = await lib('qr.mjs');
   const { size, modules } = qrMatrix('http://192.168.1.23:5173/', { ecl: 'M' });

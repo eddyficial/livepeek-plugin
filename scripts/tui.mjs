@@ -44,10 +44,12 @@ import { bareGeometry, composeBare } from './lib/bare.mjs';
 import { pickProbe, pickReference } from './lib/pick.mjs';
 import { lanAddresses, phoneUrl, reachable } from './lib/lan.mjs';
 import { qrHalfBlocks } from './lib/qr.mjs';
+import { createFrameSettler } from './lib/frame.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ESC = '\x1b';
 const out = (s) => process.stdout.write(s);
+const settleFrame = createFrameSettler();
 
 // ---------------------------------------------------------------- args ----
 const argv = process.argv.slice(2);
@@ -1193,6 +1195,7 @@ async function paint(force) {
     // timeout the pane would sit on the last good frame looking perfectly live.
     // Playwright's own timeout, not a race: a raced screenshot kept running
     // and every later one queued behind it, so the pane never recovered.
+    await settleFrame(page);
     const shot = await page.screenshot({ type: 'png', timeout: 4000 }).catch((e) => {
       throw e?.name === 'TimeoutError' ? new Error('page not responding') : e;
     });
