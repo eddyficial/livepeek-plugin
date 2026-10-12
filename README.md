@@ -11,22 +11,7 @@ checks the result instead of asking you.
 
 No browser window. No emulator. Nothing to alt-tab to.
 
-![livepeek inside Claude Code: browsing a sports app in a phone frame, opening the pane with /livepeek, then switching to desktop and iPhone sizes](docs/claude-code-demo.gif)
-
-*Watch it come alive as you build: Claude Code on the left, the live preview on the right, all in one terminal.*
-
-![Windows Terminal with PowerShell on the left and livepeek on the right, showing a fitness app inside an iPhone 15 Pro frame](docs/windows-terminal.png)
-
-*A phone app in Windows Terminal: your shell on the left, the app in an iPhone frame on the right. Save a file and it updates.*
-
-![livepeek showing a landing page at desktop, laptop and phone sizes, then a markdown spec, then a live edit landing](docs/demo.gif)
-
-<p>
-  <img src="docs/screenshots/1-phone.png" width="49%" alt="Clicking and scrolling a site in a phone frame inside the terminal">
-  <img src="docs/screenshots/2-devices.png" width="49%" alt="The device picker listing 34 phones, tablets, desktops and documents">
-  <img src="docs/screenshots/3-desktop.png" width="49%" alt="The same site at a 1440 px desktop size beside Claude Code">
-  <img src="docs/screenshots/4-iphone.png" width="49%" alt="Claude checking the live page in an iPhone 17 Pro Max frame">
-</p>
+![livepeek showing a sample landing page at desktop and phone sizes](docs/demo.gif)
 
 ```
 /livepeek:livepeek
