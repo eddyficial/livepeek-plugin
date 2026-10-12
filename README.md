@@ -11,6 +11,17 @@ checks the result instead of asking you.
 
 No browser window. No emulator. Nothing to alt-tab to.
 
+![livepeek inside Claude Code: browsing a sports app in a phone frame, opening the pane with /livepeek, then switching to desktop and iPhone sizes](docs/claude-code-demo.gif)
+
+*Watch it come alive as you build: Claude Code on the left, the live preview on the right, all in one terminal.*
+
+<p>
+  <img src="docs/screenshots/1-phone.png" width="49%" alt="Clicking and scrolling a site in a phone frame inside the terminal">
+  <img src="docs/screenshots/2-devices.png" width="49%" alt="The device picker listing 34 phones, tablets, desktops and documents">
+  <img src="docs/screenshots/3-desktop.png" width="49%" alt="The same site at a 1440 px desktop size beside Claude Code">
+  <img src="docs/screenshots/4-iphone.png" width="49%" alt="Claude checking the live page in an iPhone 17 Pro Max frame">
+</p>
+
 ![livepeek showing a sample landing page at desktop and phone sizes](docs/demo.gif)
 
 ```
@@ -67,10 +78,10 @@ top-level `bin/` is on its PATH.
 
 For PowerShell, cmd, or shells outside Claude Code, copy a wrapper from the
 installed plugin cache into a folder on your PATH. With the default Claude
-configuration, the v0.7.5 wrappers are here:
+configuration, the v0.7.10 wrappers are here:
 
 ```
-~/.claude/plugins/cache/livepeek/livepeek/0.7.5/bin/
+~/.claude/plugins/cache/livepeek/livepeek/0.7.10/bin/
 ```
 
 These examples use `$HOME\bin` on Windows and `~/.local/bin` on macOS and
@@ -80,14 +91,14 @@ Windows PowerShell:
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\bin" | Out-Null
-Copy-Item "$HOME\.claude\plugins\cache\livepeek\livepeek\0.7.5\bin\livepeek.cmd" "$HOME\bin\livepeek.cmd"
+Copy-Item "$HOME\.claude\plugins\cache\livepeek\livepeek\0.7.10\bin\livepeek.cmd" "$HOME\bin\livepeek.cmd"
 ```
 
 macOS or Linux:
 
 ```bash
 mkdir -p ~/.local/bin
-cp ~/.claude/plugins/cache/livepeek/livepeek/0.7.5/bin/livepeek ~/.local/bin/livepeek
+cp ~/.claude/plugins/cache/livepeek/livepeek/0.7.10/bin/livepeek ~/.local/bin/livepeek
 chmod +x ~/.local/bin/livepeek
 ```
 
