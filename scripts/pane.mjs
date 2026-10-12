@@ -113,7 +113,7 @@ try {
   pkg = JSON.parse(fs.readFileSync(path.join(root, 'package.json'), 'utf8'));
 } catch { /* --url does not need a project at all */ }
 
-const fw = detectFramework(pkg);
+const fw = detectFramework(pkg, root);
 
 // ---------------------------------------------------------- static / docs ----
 /**
@@ -175,7 +175,15 @@ if (fw && fw.missing?.length && !URL_ARG) {
   process.exit(2);   // distinct code so the skill can offer to fix it
 }
 
-const PORT   = parseInt(arg('--port', String(fw?.port ?? 3000)), 10);
+// When neither the dev script nor the config names a port, the port this
+// project was last shown on (a --port given then) beats the framework default.
+function rememberedPort() {
+  if (!fw || fw.portFrom !== 'default') return null;
+  const seen = projects.list().find(p => samePath(p.dir, root) && p.kind === fw.id);
+  return seen?.port ?? null;
+}
+
+const PORT   = parseInt(arg('--port', String(rememberedPort() ?? fw?.port ?? 3000)), 10);
 const TARGET = URL_ARG || (STATIC ? 'static' : `http://localhost:${PORT}`);
 // Web and document views default to 'fit': rendered at the pane's own pixel
 // size, so text is never scaled down. Fixed presets stay one --preset away.

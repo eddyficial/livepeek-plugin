@@ -2,7 +2,8 @@
 import fs from 'node:fs';
 import http from 'node:http';
 import path from 'node:path';
-import { HOME, TMP, lib, tmpdir, test, eq, assert, serve, httpGetRaw } from './helpers.mjs';
+import { pathToFileURL } from 'node:url';
+import { HOME, TMP, SCRIPTS, lib, tmpdir, test, eq, assert, serve, httpGetRaw } from './helpers.mjs';
 
 const ESC = '\x1b';
 
@@ -276,4 +277,36 @@ await test('textview.layoutText wraps, keeps spans, bullets and rules', async ()
   eq(plain(linked).slice(sp.c0, sp.c1), 'docs', 'span range text');
   assert(lines.some(l => plain(l).startsWith('  • one')), 'no bullet line');
   assert(lines.some(l => /^─+$/.test(plain(l))), 'no hr line');
+});
+
+await test('portFromConfig reads server.port and ignores hmr, proxies and comments', async () => {
+  const { portFromConfig } = await import(pathToFileURL(path.join(SCRIPTS, 'targets.mjs')).href);
+  const vite = `export default defineConfig({
+    // server: { port: 1111 },
+    server: {
+      proxy: { '/api': 'http://127.0.0.1:5281', '/ws': { target: 'ws://x:9999', port: 2222 } },
+      hmr: { port: 24678 },
+      port: 5280,
+      strictPort: true,
+    },
+  });`;
+  eq(portFromConfig(vite, 'server'), 5280, 'vite server.port');
+  eq(portFromConfig('export default { server: { hmr: { port: 24678 } } }', 'server'), null, 'hmr only');
+  eq(portFromConfig('export default { server: { port: Number(process.env.PORT) || 4000 } }', 'server'), 4000, 'computed port');
+  eq(portFromConfig('export default { devServer: { port: 3100 } }', 'devServer'), 3100, 'nuxt devServer');
+  eq(portFromConfig('export default { preview: { port: 4173 } }', 'server'), null, 'preview is not server');
+});
+
+await test('detectFramework takes the port from the script, then the config, then the default', async () => {
+  const { detectFramework } = await import(pathToFileURL(path.join(SCRIPTS, 'targets.mjs')).href);
+  const dir = tmpdir('fw-config-port');
+  fs.writeFileSync(path.join(dir, 'vite.config.ts'), "export default { server: { port: 5280 } };\n");
+  const pkg = { devDependencies: { vite: '^7' }, scripts: { dev: 'vite' } };
+  let fw = detectFramework(pkg, dir);
+  eq([fw.port, fw.portFrom], [5280, 'config'], 'config port');
+  assert(!('config' in fw), 'internal config spec leaked into the result');
+  fw = detectFramework({ ...pkg, scripts: { dev: 'vite --port 6000' } }, dir);
+  eq([fw.port, fw.portFrom], [6000, 'script'], 'script flag beats config');
+  fw = detectFramework(pkg, tmpdir('fw-no-config'));
+  eq([fw.port, fw.portFrom], [5173, 'default'], 'default without a config');
 });

@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
 import { ROOT, SCRIPTS, HOME, tmpdir, test, eq, assert } from './helpers.mjs';
 
 // Child processes get an allowlist, never a copy of the whole environment.
@@ -39,6 +40,25 @@ await test('pane --dry-run in a vite project -> project : vite', () => {
   const r = run('pane.mjs', ['--dry-run'], dir);
   eq(r.status, 0, 'exit code\n' + r.out);
   assert(r.out.includes('project : vite'), 'missing "project : vite"\n' + r.out);
+});
+
+await test('pane --dry-run targets the port set in vite.config, not 5173', () => {
+  const dir = tmpdir('dry-vite-config');
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'v', scripts: { dev: 'vite' }, devDependencies: { vite: '^7.0.0' } }));
+  fs.writeFileSync(path.join(dir, 'vite.config.ts'), "export default { server: { port: 5280, proxy: { '/api': 'http://127.0.0.1:5281' } } };\n");
+  const r = run('pane.mjs', ['--dry-run'], dir);
+  eq(r.status, 0, 'exit code\n' + r.out);
+  assert(r.out.includes('target  : http://localhost:5280'), 'missing config port\n' + r.out);
+});
+
+await test('pane --dry-run reuses the port a project was last shown on', async () => {
+  const dir = tmpdir('dry-vite-remembered');
+  fs.writeFileSync(path.join(dir, 'package.json'), JSON.stringify({ name: 'v', scripts: { dev: 'vite' }, devDependencies: { vite: '^7.0.0' } }));
+  const projects = await import(pathToFileURL(path.join(SCRIPTS, 'lib', 'projects.mjs')).href);
+  projects.remember({ dir, name: 'v', kind: 'vite', file: null, url: 'http://localhost:4444', script: 'dev', port: 4444, preset: 'fit' });
+  const r = run('pane.mjs', ['--dry-run'], dir);
+  eq(r.status, 0, 'exit code\n' + r.out);
+  assert(r.out.includes('target  : http://localhost:4444'), 'missing remembered port\n' + r.out);
 });
 
 await test('pane --dry-run in an empty folder shows the welcome notice', () => {
