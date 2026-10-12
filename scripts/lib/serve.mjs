@@ -47,9 +47,12 @@ export function gateLanRequest(token, serve) {
     const cookieName = `lp_t_${req.socket.localPort}`;
     if (sameToken(url.searchParams.get('t'), token)) {
       url.searchParams.delete('t');
+      // Lax, not Strict: a QR code opened from the phone's camera app is a
+      // cross-site navigation, and Strict cookies are withheld on it and on
+      // this redirect, so the phone would land on a 403.
       res.writeHead(302, {
         location: '/' + url.pathname.replace(/^\/+/, '') + url.search,
-        'set-cookie': `${cookieName}=${token}; HttpOnly; SameSite=Strict; Path=/`,
+        'set-cookie': `${cookieName}=${token}; HttpOnly; SameSite=Lax; Path=/`,
         'cache-control': 'no-store',
       });
       return res.end();
