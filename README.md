@@ -22,8 +22,6 @@ No browser window. No emulator. Nothing to alt-tab to.
   <img src="docs/screenshots/4-iphone.png" width="49%" alt="Claude checking the live page in an iPhone 17 Pro Max frame">
 </p>
 
-![livepeek showing a sample landing page at desktop and phone sizes](docs/demo.gif)
-
 ```
 /livepeek:livepeek
 ```
