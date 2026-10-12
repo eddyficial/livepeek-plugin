@@ -61,6 +61,12 @@ That's it. livepeek will:
 3. start your dev server if it isn't already running
 4. split your terminal and draw the view in the new pane
 
+livepeek takes the dev server's port from your dev script or framework config
+(such as `vite.config.ts`) and remembers it. If Vite moves to another port
+because its own is taken, livepeek follows it, and it never shows another
+project's server that happens to be on the same port. A dev server livepeek
+started is stopped again when you quit.
+
 First run takes a few seconds, or up to a minute if it has to start your dev
 server from cold.
 
@@ -90,10 +96,10 @@ building: a phone frame around it would misrepresent it.
 
 You do not have to be in a Claude session. Copy a wrapper from the installed
 plugin cache into a folder on your PATH. With the default Claude configuration,
-version 0.7.5 is under:
+version 0.7.10 is under:
 
 ```
-~/.claude/plugins/cache/livepeek/livepeek/0.7.5/bin/
+~/.claude/plugins/cache/livepeek/livepeek/0.7.10/bin/
 ```
 
 On Windows, copy `livepeek.cmd`. On macOS or Linux, copy `livepeek` and make it
@@ -164,6 +170,16 @@ Two things to know:
   you're in.
 - **Click a text field before typing into it.** The click focuses it, exactly
   like in a browser. If typing seems to do nothing, this is almost always why.
+
+### Open it on your phone
+
+Press `m` for a QR code and scan it with your phone camera; the phone has to be
+on the same Wi-Fi. Your dev server must listen on the network for this:
+`npm run dev -- --host` for Vite and Astro, `npm run dev -- -H 0.0.0.0` for
+Next.js. The QR screen tells you when it can't reach yours. For a plain folder
+or file, press `s` on the QR screen to share it; opening the link gives that
+phone a private cookie, so the page works. If the phone still can't load it, allow
+Node.js through your firewall.
 
 ## If something looks wrong
 
@@ -259,6 +275,7 @@ and type to filter the list.
 /livepeek:livepeek --file docs/spec.md        show one file (markdown or html)
 /livepeek:livepeek --snapshot out.png         write what the pane shows to a PNG
 /livepeek:livepeek --eval 'innerWidth'        run a snippet in the shown page
+/livepeek:livepeek --picked                   the element you last pointed at with x, as JSON
 /livepeek:livepeek --here                     run in this pane, don't split
 /livepeek:livepeek --new                      force a second pane instead of reusing
 /livepeek:livepeek --quit                     close the open pane cleanly
@@ -291,6 +308,11 @@ Tell Claude "change the header to orange" and it can edit the file, then run
 `/livepeek:livepeek --snapshot` and look at the result before telling you it's done. The
 plugin's skill already instructs it to. If you want to see what it saw, the
 PNG it wrote is the page at full size.
+
+To show Claude exactly what to change, press `x` in the pane, click the
+element, then tell Claude "change this". It reads your pick with
+`/livepeek:livepeek --picked`: the text, a selector, and the React or Vue
+component behind it.
 
 ## Still stuck?
 
