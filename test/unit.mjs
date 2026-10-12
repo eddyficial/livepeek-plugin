@@ -224,7 +224,7 @@ await test('LAN gate exchanges its token for a cookie and strips it from the URL
     const accepted = await httpGetRaw(base, '/docs?keep=1&t=' + token);
     eq(accepted.status, 302, 'good token');
     eq(accepted.headers.location, '/docs?keep=1', 'token stripped, other query kept');
-    assert(String(accepted.headers['set-cookie']).includes(`${cookieName}=${token}; HttpOnly; SameSite=Strict; Path=/`), 'per-port cookie missing');
+    assert(String(accepted.headers['set-cookie']).includes(`${cookieName}=${token}; HttpOnly; SameSite=Lax; Path=/`), 'per-port cookie missing');
     eq((await httpGetRaw(base, '/', { cookie: `lp_t_1=${token}` })).status, 403, 'another port cookie is rejected');
     const served = await httpGetRaw(base, '/', { cookie: `${cookieName}=bad; ${cookieName}=${token}` });
     eq(served.status, 200, 'cookie reaches static server');
