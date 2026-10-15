@@ -94,8 +94,8 @@ building: a phone frame around it would misrepresent it.
 
 ## Opening it without Claude
 
-You do not have to be in a Claude session. To use livepeek with Codex or
-OpenCode, install it with npm and give that
+You do not have to be in a Claude session. To use livepeek with Codex,
+OpenCode or Gemini CLI, install it with npm and give that
 agent the skill:
 
 ```
@@ -103,10 +103,10 @@ npm install --global github:eddyficial/livepeek-plugin
 livepeek --install-skill
 ```
 
-The skill lands in `~/.agents/skills/livepeek/`, which Codex and OpenCode
-both read; `--to <dir>` puts it in another agent's skills folder.
-OpenCode also gets a `/livepeek` command. Start a new session in your agent
-and type `/livepeek` (OpenCode) or `$livepeek` (Codex, which opens skills
+The skill lands in `~/.agents/skills/livepeek/`, which Codex, OpenCode and
+Gemini CLI all read; `--to <dir>` puts it in another agent's skills folder.
+OpenCode and Gemini CLI also get a `/livepeek` command. Start a new session
+in your agent and type `/livepeek` (OpenCode, Gemini CLI) or `$livepeek` (Codex, which opens skills
 with `$`; `/` only lists its built-in commands), or ask it to "open livepeek".
 
 If you already have the Claude Code plugin, you can instead copy a wrapper from the installed

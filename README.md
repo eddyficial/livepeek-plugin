@@ -1,7 +1,7 @@
 # livepeek
 
-A live viewing portal in your terminal. Works with Claude Code, Codex and
-OpenCode.
+A live viewing portal in your terminal. Works with Claude Code, Codex,
+OpenCode and Gemini CLI.
 
 Whatever you're building (a website, a game, a phone app, a document, a
 mockup), livepeek renders it live in a split pane next to your work. Edit a
@@ -28,9 +28,12 @@ No browser window. No emulator. Nothing to alt-tab to.
 | Claude Code | type `/livepeek:livepeek` |
 | Codex | type `$livepeek` (Codex opens skills with `$`; `/` lists only its built-in commands) |
 | OpenCode | type `/livepeek` |
+| Gemini CLI | type `/livepeek` |
 
 In any of them you can also just ask "open livepeek", and in a plain shell you
-run `livepeek`. [Install](#install) covers setting up each one.
+run `livepeek`. [Install](#install) covers setting up each one, [Keys](#keys)
+lists what each key does in the pane, and [Options](#options) lists every
+command.
 
 That's the whole interface. It works out what your project is, starts the dev
 server if it isn't running, detects your terminal, and splits it.
@@ -74,7 +77,7 @@ If you point livepeek at a Vite, Next or Expo project, that project's dependenci
 To update later, run `/plugin marketplace update livepeek`, then restart
 Claude Code.
 
-### Codex and OpenCode
+### Codex, OpenCode and Gemini CLI
 
 ```
 npm install --global github:eddyficial/livepeek-plugin
@@ -83,15 +86,15 @@ livepeek --install-skill
 
 The first line puts `livepeek` on your PATH. The second copies livepeek's
 skill to `~/.agents/skills/livepeek/`, the shared skills folder that
-Codex and OpenCode read, so your agent knows how to open the pane
-and check its own changes. It also adds a `/livepeek` command for OpenCode
-in `~/.config/opencode/commands/`. Start a new agent session afterwards, then
-type `/livepeek` in OpenCode or `$livepeek` in Codex, or ask any agent to
-"open livepeek".
+Codex, OpenCode and Gemini CLI read, so your agent knows how to open the
+pane and check its own changes. It also adds a `/livepeek` command for
+OpenCode (`~/.config/opencode/commands/livepeek.md`) and Gemini CLI
+(`~/.gemini/commands/livepeek.toml`). Start a new agent session afterwards,
+then open it as the table at the top shows.
 
-- `--install-skill --project` puts both in this project's `.agents/skills/`
-  and `.opencode/commands/` instead.
-- `--install-skill --to <dir>` puts only the skill in any other skills folder,
+- `--install-skill --project` puts all of these in this project's
+  `.agents/skills/`, `.opencode/commands/` and `.gemini/commands/` instead.
+- `--install-skill --to <dir>` puts only the skill, no commands, in any other skills folder,
   such as `~/.config/opencode/skills`.
 - An agent with no skills support can still use it: add a line to its
   instructions file (`AGENTS.md`, `CONVENTIONS.md`) pointing at the installed
@@ -273,7 +276,7 @@ the only pane left, so close it with `q`.
 ## Keys
 
 Focus the pane first: `alt`+arrow in most terminals, `prefix`+arrow in tmux,
-or click the picture. If letters you press turn up in Claude's input box
+or click the picture. If letters you press turn up in your agent's input box
 instead, the focus is still on the other pane.
 
 | key | does |
@@ -292,11 +295,13 @@ instead, the focus is still on the other pane.
 | `c` | copy the frame to the clipboard as an image |
 | `w` | open the page in your own browser, full size (or click the address in the header) |
 | `g` | go to a page: type `/settings` (or `localhost:3000`) and press enter |
-| `x` | point at something: hover outlines it, a click picks it for Claude and copies a reference to paste |
-| `m` | QR code: scan it to open the page on your phone (same Wi-Fi) |
+| `x` | point at something: hover outlines it, a click picks it for your agent and copies a reference to paste |
+| `m` | QR code: scan it to open the page on your phone (same Wi-Fi); `s` there shares a folder livepeek serves itself |
 | `.` | pause refreshing |
 | `b` | cycle renderer: kitty, sixel, text, half-blocks |
+| `esc` | stop typing or pointing, close the picker or a prompt |
 | `q` | quit and close the pane |
+| `ctrl`+`c` | quit, even in typing mode |
 
 Anything with alt or ctrl held is left alone, so your terminal's own bindings
 still work; alt+arrow moves between panes rather than reaching the viewer.
@@ -399,31 +404,39 @@ analogue-feeling input will be approximate.
 
 ## Options
 
-```
-/livepeek:livepeek --preset laptop          a different viewport
-/livepeek:livepeek --url http://localhost:1234   skip detection, point at a server
-/livepeek:livepeek --port 3000              non-default dev server port
-/livepeek:livepeek --size 0.4               wider pane
-/livepeek:livepeek --interval 200           refresh faster (default 600 ms, more CPU)
-/livepeek:livepeek --render sixel           force a renderer: kitty, sixel or blocks
-/livepeek:livepeek --horizontal             split below instead of beside
-/livepeek:livepeek --no-serve               a server is already running
-/livepeek:livepeek --file docs/spec.md      show one file (markdown or html)
-/livepeek:livepeek --snapshot out.png       write what the pane shows to a PNG
-/livepeek:livepeek --eval 'innerWidth'      run a snippet in the shown page
-/livepeek:livepeek --picked                 the element you last pointed at (x, then click), as JSON
-/livepeek:livepeek --here                   run in this pane, don't split
-/livepeek:livepeek --new                    force a second pane instead of reusing
-/livepeek:livepeek --quit                   close the open pane cleanly
-/livepeek:livepeek --compare desktop,iphone-15-pro   two panes side by side, one per preset (--quit closes the first; q closes either)
-/livepeek:livepeek --status                 what this terminal's pane shows, as JSON
-/livepeek:livepeek --doctor                 check Node, browser, driver, terminal and graphics, say what will work
-/livepeek:livepeek --dry-run                print what it would do and stop
-livepeek --install-skill                    teach another agent (see Install); --project or --to <dir> to choose where
-```
+Every command, as you would run it in a shell. In Claude Code, put
+`/livepeek:livepeek` in place of `livepeek` (`/livepeek:livepeek --preset laptop`);
+in Codex, OpenCode or Gemini CLI, ask your agent or run it in a shell. Inside
+the open pane, use the [keys](#keys) instead.
 
-Outside Claude Code, the same options follow `livepeek` instead of
-`/livepeek:livepeek`.
+| command | does |
+|---|---|
+| **Open and close** |  |
+| `livepeek` | open the pane for this project: detects it, starts the dev server, splits the terminal |
+| `livepeek --quit` | close the open pane cleanly |
+| `livepeek --here` | run in this pane instead of splitting |
+| `livepeek --new` | open a second pane instead of reusing this terminal's |
+| `livepeek --compare desktop,iphone-15-pro` | two panes side by side, one per device (`--quit` closes the first; `q` closes either) |
+| **What to show** |  |
+| `livepeek --preset laptop` | start on a different device size (`--device` works too; `space` in the pane lists them) |
+| `livepeek --url http://localhost:1234` | skip detection, point at this address |
+| `livepeek --port 3000` | the dev server uses a non-default port |
+| `livepeek --no-serve` | a server is already running; don't start one |
+| `livepeek --file docs/spec.md` | show one file (Markdown or HTML) |
+| **How it looks** |  |
+| `livepeek --size 0.4` | pane width as a share of the terminal (default 0.34) |
+| `livepeek --horizontal` | split below instead of beside |
+| `livepeek --interval 200` | refresh every 200 ms (default 600; faster uses more CPU) |
+| `livepeek --render sixel` | force a renderer: `kitty`, `sixel` or `blocks` |
+| **For your agent** |  |
+| `livepeek --snapshot out.png` | write what the pane shows to a PNG |
+| `livepeek --eval 'innerWidth'` | run a snippet in the shown page and print the result |
+| `livepeek --picked` | the element you last pointed at (`x`, then click), as JSON |
+| `livepeek --status` | what this terminal's pane shows, as JSON |
+| **Setup and checks** |  |
+| `livepeek --doctor` | check Node, browser, driver, terminal and graphics, and say what will work |
+| `livepeek --dry-run` | print what it would do, then stop |
+| `livepeek --install-skill` | teach Codex, OpenCode and Gemini CLI to use livepeek (see [Install](#install)); `--project` or `--to <dir>` choose where |
 
 ## Your agent can see it
 
@@ -480,7 +493,7 @@ Everything livepeek does, so you can check it before installing. It collects and
 - **Shares with a one-time link.** If you explicitly share livepeek's server on your LAN, the QR/link exchanges its one-time token for an HttpOnly cookie before serving files.
 - **Starts your dev server, only if you ask.** Opening a Vite, Next, Expo or similar project runs that project's own `npm run` script, and picking a stopped project in the `p` list does the same. A dev server livepeek starts is stopped when it is replaced or livepeek exits.
 - **Writes a little local state** to `~/.livepeek/`: which panes are open (`panes/`, one small file per terminal), the folders you have previewed (`projects.json`), and whether the first-run welcome card still needs showing (`intro.json`). On first use, an existing `~/.peek/` is migrated when the new directory does not yet exist. Delete the folder to clear it.
-- **Writes a skill file, only if you ask.** `livepeek --install-skill` copies `SKILL.md` into `~/.agents/skills/livepeek/` (or the folder you name) for agents other than Claude Code, and writes OpenCode's `/livepeek` command to `~/.config/opencode/commands/livepeek.md`. Delete those to remove them.
+- **Writes a skill file, only if you ask.** `livepeek --install-skill` copies `SKILL.md` into `~/.agents/skills/livepeek/` (or the folder you name) for agents other than Claude Code, and writes the `/livepeek` commands for OpenCode (`~/.config/opencode/commands/livepeek.md`) and Gemini CLI (`~/.gemini/commands/livepeek.toml`). Delete those to remove them.
 - **Sends nothing anywhere.** No telemetry, no analytics, no account, no outbound requests of its own. The pages you preview make whatever requests they normally would.
 - **Has no hooks and no MCP server.** It adds one skill and one optional `livepeek` shell command.
 - **Clipboard, only when you press `c`.** Copying a frame uses PowerShell on Windows, `osascript` on macOS, and `wl-copy` or `xclip` on Linux. Nothing is read from the clipboard.

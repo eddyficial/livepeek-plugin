@@ -89,6 +89,8 @@ await test('pane --install-skill writes the skill to ~/.agents/skills with the i
   assert(text.includes(`node "${ROOT.split(path.sep).join('/')}/scripts/pane.mjs"`), 'install path not filled in');
   const command = fs.readFileSync(path.join(HOME, '.config', 'opencode', 'commands', 'livepeek.md'), 'utf8');
   assert(command.startsWith('---\ndescription:') && command.includes('livepeek $ARGUMENTS'), 'OpenCode command\n' + command);
+  const gemini = fs.readFileSync(path.join(HOME, '.gemini', 'commands', 'livepeek.toml'), 'utf8');
+  assert(gemini.startsWith('description = "') && /prompt = '''\n[^]*livepeek \{\{args\}\}[^]*\n'''\n$/.test(gemini), 'Gemini CLI command\n' + gemini);
 });
 
 await test('pane --install-skill --project and --to choose the folder', () => {
@@ -96,6 +98,7 @@ await test('pane --install-skill --project and --to choose the folder', () => {
   eq(run('pane.mjs', ['--install-skill', '--project'], dir).status, 0, 'exit code (--project)');
   assert(fs.existsSync(path.join(dir, '.agents', 'skills', 'livepeek', 'SKILL.md')), 'no project skill');
   assert(fs.existsSync(path.join(dir, '.opencode', 'commands', 'livepeek.md')), 'no project OpenCode command');
+  assert(fs.existsSync(path.join(dir, '.gemini', 'commands', 'livepeek.toml')), 'no project Gemini CLI command');
   eq(run('pane.mjs', ['--install-skill', '--to', 'custom'], dir).status, 0, 'exit code (--to)');
   assert(fs.existsSync(path.join(dir, 'custom', 'livepeek', 'SKILL.md')), 'no --to skill');
   assert(!fs.existsSync(path.join(dir, 'custom', 'livepeek.md')), '--to wrote a command');
