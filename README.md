@@ -28,9 +28,9 @@ No browser window. No emulator. Nothing to alt-tab to.
 /livepeek:livepeek
 ```
 
-That's the whole interface. In OpenCode it's `/livepeek`; in Codex, Gemini CLI
-or any other agent, ask it to "open livepeek"; in a plain shell, run
-`livepeek`. It works out what your project is, starts the dev
+That's the whole interface. In OpenCode it's `/livepeek`; in Codex it's
+`$livepeek` (Codex opens skills with `$`, not `/`); in Gemini CLI or any other
+agent, ask it to "open livepeek"; in a plain shell, run `livepeek`. It works out what your project is, starts the dev
 server if it isn't running, detects your terminal, and splits it.
 
 Run it again from a different project and the **same pane** switches to it,
@@ -84,7 +84,8 @@ skill to `~/.agents/skills/livepeek/`, the shared skills folder that
 OpenCode, Codex and Gemini CLI read, so your agent knows how to open the pane
 and check its own changes. It also adds a `/livepeek` command for OpenCode
 in `~/.config/opencode/commands/`. Start a new agent session afterwards, then
-type `/livepeek` in OpenCode, or ask any agent to "open livepeek".
+type `/livepeek` in OpenCode or `$livepeek` in Codex, or ask any agent to
+"open livepeek".
 
 - `--install-skill --project` puts both in this project's `.agents/skills/`
   and `.opencode/commands/` instead.
