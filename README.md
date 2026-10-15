@@ -1,8 +1,7 @@
 # livepeek
 
-A live viewing portal in your terminal. A Claude Code plugin that also works
-with OpenCode, Codex, Gemini CLI and any other coding agent that runs in a
-terminal.
+A live viewing portal in your terminal. Works with Claude Code, Codex and
+OpenCode.
 
 Whatever you're building (a website, a game, a phone app, a document, a
 mockup), livepeek renders it live in a split pane next to your work. Edit a
@@ -24,13 +23,16 @@ No browser window. No emulator. Nothing to alt-tab to.
   <img src="docs/screenshots/4-iphone.png" width="49%" alt="Claude checking the live page in an iPhone 17 Pro Max frame">
 </p>
 
-```
-/livepeek:livepeek
-```
+| Agent | How to open it |
+|---|---|
+| Claude Code | type `/livepeek:livepeek` |
+| Codex | type `$livepeek` (Codex opens skills with `$`; `/` lists only its built-in commands) |
+| OpenCode | type `/livepeek` |
 
-That's the whole interface. In OpenCode it's `/livepeek`; in Codex it's
-`$livepeek` (Codex opens skills with `$`, not `/`); in Gemini CLI or any other
-agent, ask it to "open livepeek"; in a plain shell, run `livepeek`. It works out what your project is, starts the dev
+In any of them you can also just ask "open livepeek", and in a plain shell you
+run `livepeek`. [Install](#install) covers setting up each one.
+
+That's the whole interface. It works out what your project is, starts the dev
 server if it isn't running, detects your terminal, and splits it.
 
 Run it again from a different project and the **same pane** switches to it,
@@ -72,7 +74,7 @@ If you point livepeek at a Vite, Next or Expo project, that project's dependenci
 To update later, run `/plugin marketplace update livepeek`, then restart
 Claude Code.
 
-### OpenCode, Codex, Gemini CLI and other agents
+### Codex and OpenCode
 
 ```
 npm install --global github:eddyficial/livepeek-plugin
@@ -81,7 +83,7 @@ livepeek --install-skill
 
 The first line puts `livepeek` on your PATH. The second copies livepeek's
 skill to `~/.agents/skills/livepeek/`, the shared skills folder that
-OpenCode, Codex and Gemini CLI read, so your agent knows how to open the pane
+Codex and OpenCode read, so your agent knows how to open the pane
 and check its own changes. It also adds a `/livepeek` command for OpenCode
 in `~/.config/opencode/commands/`. Start a new agent session afterwards, then
 type `/livepeek` in OpenCode or `$livepeek` in Codex, or ask any agent to
