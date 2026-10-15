@@ -38,6 +38,10 @@ if (flag('--doctor')) {
   const r = spawnSync(process.execPath, [path.join(__dirname, 'doctor.mjs')], { stdio: 'inherit' });
   process.exit(r.status ?? 1);
 }
+if (flag('--install-skill')) {
+  const r = spawnSync(process.execPath, [path.join(__dirname, 'install-skill.mjs'), ...argv.filter(a => a !== '--install-skill')], { stdio: 'inherit' });
+  process.exit(r.status ?? 1);
+}
 
 // --status: what this terminal's pane is showing, as one line of JSON, for a
 // status line or for Claude to read the page's error count. Read-only, so it

@@ -78,3 +78,49 @@ await test('tui --preset nope exits 1', () => {
   const r = run('tui.mjs', ['--preset', 'nope'], ROOT);
   eq(r.status, 1, 'exit code\n' + r.out);
 });
+
+// ------------------------------------------------------ c. other agents ----
+await test('pane --install-skill writes the skill to ~/.agents/skills with the install path filled in', () => {
+  const r = run('pane.mjs', ['--install-skill'], tmpdir('skill-home'));
+  eq(r.status, 0, 'exit code\n' + r.out);
+  const text = fs.readFileSync(path.join(HOME, '.agents', 'skills', 'livepeek', 'SKILL.md'), 'utf8');
+  assert(text.startsWith('---') && /\nname: livepeek\r?\n/.test(text), 'frontmatter missing\n' + text.slice(0, 200));
+  assert(!text.includes('node "${CLAUDE_PLUGIN_ROOT}'), 'placeholder left in the launch command');
+  assert(text.includes(`node "${ROOT.split(path.sep).join('/')}/scripts/pane.mjs"`), 'install path not filled in');
+});
+
+await test('pane --install-skill --project and --to choose the folder', () => {
+  const dir = tmpdir('skill-project');
+  eq(run('pane.mjs', ['--install-skill', '--project'], dir).status, 0, 'exit code (--project)');
+  assert(fs.existsSync(path.join(dir, '.agents', 'skills', 'livepeek', 'SKILL.md')), 'no project skill');
+  eq(run('pane.mjs', ['--install-skill', '--to', 'custom'], dir).status, 0, 'exit code (--to)');
+  assert(fs.existsSync(path.join(dir, 'custom', 'livepeek', 'SKILL.md')), 'no --to skill');
+});
+
+/** Run a bin/ wrapper (the .cmd on Windows) with --dry-run, as a shell would. */
+function wrapper(file, cwd, extra = {}) {
+  const env = safeEnv({ HOME, USERPROFILE: HOME, CLAUDE_CONFIG_DIR: path.join(HOME, 'no-claude'), ...extra });
+  for (const k of ['TMUX', 'ZELLIJ', 'KITTY_LISTEN_ON', 'WEZTERM_PANE', 'WT_SESSION']) delete env[k];
+  const r = process.platform === 'win32'
+    ? spawnSync(process.env.ComSpec || 'cmd.exe', ['/d', '/c', file + '.cmd', '--dry-run'], { cwd, env, encoding: 'utf8', timeout: 30000 })
+    : spawnSync('sh', [file, '--dry-run'], { cwd, env, encoding: 'utf8', timeout: 30000 });
+  return { status: r.status, out: (r.stdout || '') + (r.stderr || '') };
+}
+
+await test('the bin/ wrapper finds the install it lives in, with no Claude Code plugin registry', () => {
+  const dir = tmpdir('wrapper-self');
+  fs.writeFileSync(path.join(dir, 'index.html'), '<h1>x</h1>');
+  const r = wrapper(path.join(ROOT, 'bin', 'livepeek'), dir);
+  eq(r.status, 0, 'exit code\n' + r.out);
+  assert(r.out.includes('target  : static'), 'missing "target  : static"\n' + r.out);
+});
+
+await test('a wrapper copied away from any install says how to install, and LIVEPEEK_HOME fixes it', () => {
+  const dir = tmpdir('wrapper-copy');
+  for (const name of ['livepeek', 'livepeek.cmd']) fs.copyFileSync(path.join(ROOT, 'bin', name), path.join(dir, name));
+  const r = wrapper(path.join(dir, 'livepeek'), dir);
+  eq(r.status, 1, 'exit code\n' + r.out);
+  assert(r.out.includes('livepeek is not installed') && r.out.includes('npm install --global'), 'missing install hint\n' + r.out);
+  const fixed = wrapper(path.join(dir, 'livepeek'), dir, { LIVEPEEK_HOME: ROOT });
+  eq(fixed.status, 0, 'LIVEPEEK_HOME exit code\n' + fixed.out);
+});

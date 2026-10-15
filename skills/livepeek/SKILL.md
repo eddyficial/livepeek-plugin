@@ -1,7 +1,8 @@
 ---
 name: livepeek
-description: Open a live view of whatever the user is building - a website, a game, a phone app, a document, a mockup - in a split terminal pane, and look at it yourself after making changes. Use when the user says "/livepeek:livepeek", "show me", "open the preview", "let me see it", "start the emulator", "view the site", "preview this file", or asks to watch what they are building while they edit. Also use after editing UI, game or document files to verify the change visually, and for "the preview is blank / looks wrong".
-version: 0.7.10
+description: Open a live view of whatever the user is building - a website, a game, a phone app, a document, a mockup - in a split terminal pane, and look at it yourself after making changes. Use when the user says "/livepeek:livepeek", "livepeek", "show me", "open the preview", "let me see it", "start the emulator", "view the site", "preview this file", or asks to watch what they are building while they edit. Also use after editing UI, game or document files to verify the change visually, and for "the preview is blank / looks wrong".
+metadata:
+  version: "0.7.10"
 ---
 
 # livepeek: a live viewing portal in the terminal
@@ -22,23 +23,26 @@ once (`npm add --global playwright-core@1.63.0`). livepeek downloads nothing its
 
 ## Launching it
 
-Run this through the Bash tool. Claude Code puts the plugin's top-level `bin/`
-on that tool's PATH while the plugin is enabled:
+Run this in a shell (in Claude Code, the Bash tool: it puts the plugin's
+top-level `bin/` on that tool's PATH while the plugin is enabled). Installed
+with npm or from a clone, `livepeek` is on the user's PATH in any agent:
 
 ```bash
 livepeek
 ```
 
-Do not assume the command is on the PowerShell tool's PATH. If `livepeek` is
-not found, run this instead, with the same arguments:
+In Claude Code, do not assume the command is on the PowerShell tool's PATH.
+If `livepeek` is not found, run this instead, with the same arguments:
 
 ```bash
 node "${CLAUDE_PLUGIN_ROOT}/scripts/pane.mjs"
 ```
 
-That plugin-root path is substituted into this skill when it loads. It is not
-a shell environment variable. In every command below, use the `node` form in
-place of `livepeek` if the wrapper is unavailable.
+That path is filled in when this skill loads in Claude Code, or when
+`livepeek --install-skill` copies it for another agent. It is not a shell
+environment variable. If it still reads `${CLAUDE_PLUGIN_ROOT}` literally,
+ask the user where livepeek is installed. In every command below, use the
+`node` form in place of `livepeek` if the wrapper is unavailable.
 
 Self-contained: it finds the project root, works out which framework it is,
 starts the dev server if the port is dead, detects the terminal, and splits
@@ -80,7 +84,7 @@ user whether it looks right - check:
 livepeek --snapshot .livepeek/snapshot.png
 ```
 
-then read the PNG with the Read tool. The path is relative to the project and
+then open the PNG with your image or file reading tool. The path is relative to the project and
 livepeek creates the `.livepeek` folder if it is missing; `/tmp` does not exist on
 Windows, so do not reach for it. It is the page at full resolution (the
 same thing the pane is painting), so text is legible. Wait a couple of seconds
@@ -123,7 +127,7 @@ leaves one pane that switches between them. Do not treat it as a failure, and
 do not reach for `--new` unless the user actually asks for two views side by
 side.
 
-The pane belongs to the terminal pane it was launched from, so another Claude
+The pane belongs to the terminal pane it was launched from, so another agent
 session in another tab gets its own livepeek pane and never takes over yours.
 In hosts with no pane id (the VS Code terminal, a plain console) sessions share
 one unless `LIVEPEEK_SLOT` differs.
@@ -262,7 +266,7 @@ Focus the pane first (`alt`+arrow in most terminals, `prefix`+arrow in tmux).
 | `c` | copy the current frame to the system clipboard |
 | `w` | open the page in the system browser for a full-size look; clicking the underlined address in the header does the same |
 | `g` | go to a page: type a path (`/settings`) or an address (`localhost:3000`), enter goes |
-| `x` | point mode: hover outlines elements, a click picks one for Claude (`--picked`) and copies a reference; `esc` stops |
+| `x` | point mode: hover outlines elements, a click picks one for you (`--picked`) and copies a reference; `esc` stops |
 | `m` | QR code that opens the page on a phone on the same Wi-Fi. If the dev server only listens on localhost it says how to fix that; for livepeek's own server, `s` shares it on the network until the pane quits |
 | `.` | pause refreshing |
 | `b` | cycle renderer: kitty, sixel, text, half-blocks |

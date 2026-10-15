@@ -1536,7 +1536,7 @@ const HELP = [
   ['c',       'copy the frame to the clipboard'],
   ['w',       'open the page in your browser  (or click its address)'],
   ['g',       'go to a page: type a path like /settings'],
-  ['x',       'point at something: the click picks it for Claude'],
+  ['x',       'point at something: the click picks it for your agent'],
   ['m',       'QR code to open the page on your phone'],
   ['b',       'change renderer: kitty, sixel, text, half-blocks'],
   ['shift+?', 'this help'],
@@ -1619,7 +1619,7 @@ async function stopPointing() {
   await tick(true);
 }
 
-/** Record what is under pt: on file for --picked, and on the clipboard to paste into Claude. */
+/** Record what is under pt: on file for --picked, and on the clipboard to paste into your agent. */
 async function pickAt(pt) {
   pointing = false;
   let info = null;
@@ -1628,7 +1628,7 @@ async function pickAt(pt) {
   picked = { ...info, url: pageHref || currentTarget, preset: devices[deviceIdx]?.id, viewport: vp(), at: new Date().toISOString() };
   publishIfIdle();
   const copied = await copyText(pickReference(picked));
-  notice(`picked <${info.tag}>${copied ? ' · copied, paste it to Claude' : ''}`, 5000);
+  notice(`picked <${info.tag}>${copied ? ' · copied, paste it to your agent' : ''}`, 5000);
   await tick(true);
 }
 

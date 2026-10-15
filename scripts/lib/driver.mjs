@@ -16,7 +16,8 @@ export const DRIVER_PACKAGES = ['playwright', 'playwright-core', 'patchright'];
 /** Directories to resolve the driver from, most specific first. Each ends in a separator. */
 export function driverRoots(scriptsDir) {
   const roots = [process.cwd(), scriptsDir];
-  if (process.env.CLAUDE_PLUGIN_ROOT) roots.push(process.env.CLAUDE_PLUGIN_ROOT);
+  // the install root: Claude Code exports it for plugins, LIVEPEEK_HOME names any other install
+  for (const r of [process.env.LIVEPEEK_HOME, process.env.CLAUDE_PLUGIN_ROOT]) if (r) roots.push(r);
   // npm's global root as this environment describes it
   for (const g of [process.env.npm_config_prefix, process.env.NODE_PATH]) {
     if (g) roots.push(path.join(g, 'node_modules'));

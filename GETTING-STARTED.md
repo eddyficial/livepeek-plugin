@@ -94,7 +94,20 @@ building: a phone frame around it would misrepresent it.
 
 ## Opening it without Claude
 
-You do not have to be in a Claude session. Copy a wrapper from the installed
+You do not have to be in a Claude session. To use livepeek with OpenCode,
+Codex, Gemini CLI or another terminal agent, install it with npm and give that
+agent the skill:
+
+```
+npm install --global github:eddyficial/livepeek-plugin
+livepeek --install-skill
+```
+
+The skill lands in `~/.agents/skills/livepeek/`, which OpenCode, Codex and
+Gemini CLI all read; `--to <dir>` puts it in another agent's skills folder.
+Start a new session in your agent and ask it to "open livepeek".
+
+If you already have the Claude Code plugin, you can instead copy a wrapper from the installed
 plugin cache into a folder on your PATH. With the default Claude configuration,
 version 0.7.10 is under:
 
@@ -302,11 +315,12 @@ It drives a real browser, so it shows what a browser shows, and nothing else.
 - **Pixel-exact design review**: half-block mode especially is approximate.
   Use a real browser for final visual QA.
 
-## Letting Claude check its own work
+## Letting your agent check its own work
 
 Tell Claude "change the header to orange" and it can edit the file, then run
 `/livepeek:livepeek --snapshot` and look at the result before telling you it's done. The
-plugin's skill already instructs it to. If you want to see what it saw, the
+plugin's skill already instructs it to, and so does the copy
+`livepeek --install-skill` gives other agents (they run `livepeek --snapshot`). If you want to see what it saw, the
 PNG it wrote is the page at full size.
 
 To show Claude exactly what to change, press `x` in the pane, click the

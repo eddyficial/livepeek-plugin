@@ -1,12 +1,14 @@
 # livepeek
 
-A live viewing portal in your terminal. A Claude Code plugin.
+A live viewing portal in your terminal. A Claude Code plugin that also works
+with OpenCode, Codex, Gemini CLI and any other coding agent that runs in a
+terminal.
 
 Whatever you're building (a website, a game, a phone app, a document, a
 mockup), livepeek renders it live in a split pane next to your work. Edit a
 file, save, watch it change. Click, scroll and type go through to the page.
 
-And Claude can look too: after it changes something, it snapshots the pane and
+And your agent can look too: after it changes something, it snapshots the pane and
 checks the result instead of asking you.
 
 No browser window. No emulator. Nothing to alt-tab to.
@@ -58,10 +60,36 @@ If you point livepeek at a Vite, Next or Expo project, that project's dependenci
 
 ## Install
 
+### Claude Code
+
 ```
 /plugin marketplace add eddyficial/livepeek-plugin
 /plugin install livepeek@livepeek
 ```
+
+### OpenCode, Codex, Gemini CLI and other agents
+
+```
+npm install --global github:eddyficial/livepeek-plugin
+livepeek --install-skill
+```
+
+The first line puts `livepeek` on your PATH. The second copies livepeek's
+skill to `~/.agents/skills/livepeek/`, the shared skills folder that
+OpenCode, Codex and Gemini CLI read, so your agent knows how to open the pane
+and check its own changes. Start a new agent session afterwards.
+
+- `--install-skill --project` puts it in this project's `.agents/skills/` instead.
+- `--install-skill --to <dir>` puts it in any other skills folder, such as
+  `~/.config/opencode/skills`.
+- An agent with no skills support can still use it: add a line to its
+  instructions file (`AGENTS.md`, `CONVENTIONS.md`) pointing at the installed
+  `SKILL.md`, or just ask it to run `livepeek`.
+
+A git clone works too: run `npm link` in it, or put its `bin/` folder on
+your PATH. The wrappers in `bin/` find the copy of livepeek they belong to;
+set `LIVEPEEK_HOME` to a livepeek folder to point a wrapper somewhere else.
+After an update, run `livepeek --install-skill` again so the skill matches.
 
 Nothing to add to your project. livepeek drives the Chrome or Edge already on
 your machine, headless, through the `playwright-core` driver you installed
@@ -69,6 +97,9 @@ once (see Before you start). If a project has full `playwright` with a
 downloaded Chromium, that is used instead.
 
 ## Open it from any shell
+
+Installed with npm, `livepeek` is already on your PATH everywhere, in any
+agent or plain shell; skip the rest of this section.
 
 Inside Claude Code, `/livepeek:livepeek` is one way in. The Bash tool can also
 run `livepeek` directly while the plugin is enabled because the plugin's
@@ -375,18 +406,22 @@ analogue-feeling input will be approximate.
 /livepeek:livepeek --status                 what this terminal's pane shows, as JSON
 /livepeek:livepeek --doctor                 check Node, browser, driver, terminal and graphics, say what will work
 /livepeek:livepeek --dry-run                print what it would do and stop
+livepeek --install-skill                    teach another agent (see Install); --project or --to <dir> to choose where
 ```
 
-## Claude can see it
+Outside Claude Code, the same options follow `livepeek` instead of
+`/livepeek:livepeek`.
+
+## Your agent can see it
 
 `--snapshot` writes the page the pane is showing to a PNG at full resolution,
 and `--eval` runs a snippet in it and prints the result. The bundled skill
-tells Claude to use both after it edits something you can see: change, wait a
+tells your agent (Claude, or any agent you ran `--install-skill` for) to use both after it edits something you can see: change, wait a
 beat, snapshot, look, then report what's actually on screen. You stop being
 the one who has to say "no, it's still wrong".
 
 It works the other way too. Press `x` in the pane and click the thing you
-mean, then tell Claude "make this bigger". It reads your pick with
+mean, then tell your agent "make this bigger". It reads your pick with
 `--picked`: the element's text, a selector, and the React or Vue component
 that drew it, so "this" needs no describing.
 
@@ -432,6 +467,7 @@ Everything livepeek does, so you can check it before installing. It collects and
 - **Shares with a one-time link.** If you explicitly share livepeek's server on your LAN, the QR/link exchanges its one-time token for an HttpOnly cookie before serving files.
 - **Starts your dev server, only if you ask.** Opening a Vite, Next, Expo or similar project runs that project's own `npm run` script, and picking a stopped project in the `p` list does the same. A dev server livepeek starts is stopped when it is replaced or livepeek exits.
 - **Writes a little local state** to `~/.livepeek/`: which panes are open (`panes/`, one small file per terminal), the folders you have previewed (`projects.json`), and whether the first-run welcome card still needs showing (`intro.json`). On first use, an existing `~/.peek/` is migrated when the new directory does not yet exist. Delete the folder to clear it.
+- **Writes one skill file, only if you ask.** `livepeek --install-skill` copies `SKILL.md` into `~/.agents/skills/livepeek/` (or the folder you name) for agents other than Claude Code. Delete that folder to remove it.
 - **Sends nothing anywhere.** No telemetry, no analytics, no account, no outbound requests of its own. The pages you preview make whatever requests they normally would.
 - **Has no hooks and no MCP server.** It adds one skill and one optional `livepeek` shell command.
 - **Clipboard, only when you press `c`.** Copying a frame uses PowerShell on Windows, `osascript` on macOS, and `wl-copy` or `xclip` on Linux. Nothing is read from the clipboard.
@@ -449,6 +485,7 @@ scripts/
   targets.mjs     framework -> port, dev script, default preset
   tui.mjs         the viewer itself; starts the dev server inside the pane
   doctor.mjs      --doctor: checks Node, browser, driver, terminal, graphics
+  install-skill.mjs  --install-skill: copies the skill for agents other than Claude Code
   presets.js      viewports: devices, web breakpoints, game ratios
   welcome/        the page shown when a folder has nothing to preview
   lib/driver.mjs  finds playwright-core (global, project, or full playwright)
