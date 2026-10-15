@@ -28,7 +28,9 @@ No browser window. No emulator. Nothing to alt-tab to.
 /livepeek:livepeek
 ```
 
-That's the whole interface. It works out what your project is, starts the dev
+That's the whole interface. In OpenCode it's `/livepeek`; in Codex, Gemini CLI
+or any other agent, ask it to "open livepeek"; in a plain shell, run
+`livepeek`. It works out what your project is, starts the dev
 server if it isn't running, detects your terminal, and splits it.
 
 Run it again from a different project and the **same pane** switches to it,
@@ -66,6 +68,9 @@ If you point livepeek at a Vite, Next or Expo project, that project's dependenci
 /plugin marketplace add eddyficial/livepeek-plugin
 /plugin install livepeek@livepeek
 ```
+
+To update later, run `/plugin marketplace update livepeek`, then restart
+Claude Code.
 
 ### OpenCode, Codex, Gemini CLI and other agents
 
@@ -108,12 +113,14 @@ Inside Claude Code, `/livepeek:livepeek` is one way in. The Bash tool can also
 run `livepeek` directly while the plugin is enabled because the plugin's
 top-level `bin/` is on its PATH.
 
-For PowerShell, cmd, or shells outside Claude Code, copy a wrapper from the
+For PowerShell, cmd, or shells outside Claude Code, the simplest way is the
+npm install above: `npm install --global github:eddyficial/livepeek-plugin`.
+You can use it alongside the plugin. Or copy a wrapper from the
 installed plugin cache into a folder on your PATH. With the default Claude
-configuration, the v0.7.10 wrappers are here:
+configuration, the v0.8.0 wrappers are here:
 
 ```
-~/.claude/plugins/cache/livepeek/livepeek/0.7.10/bin/
+~/.claude/plugins/cache/livepeek/livepeek/0.8.0/bin/
 ```
 
 These examples use `$HOME\bin` on Windows and `~/.local/bin` on macOS and
@@ -123,14 +130,14 @@ Windows PowerShell:
 
 ```powershell
 New-Item -ItemType Directory -Force "$HOME\bin" | Out-Null
-Copy-Item "$HOME\.claude\plugins\cache\livepeek\livepeek\0.7.10\bin\livepeek.cmd" "$HOME\bin\livepeek.cmd"
+Copy-Item "$HOME\.claude\plugins\cache\livepeek\livepeek\0.8.0\bin\livepeek.cmd" "$HOME\bin\livepeek.cmd"
 ```
 
 macOS or Linux:
 
 ```bash
 mkdir -p ~/.local/bin
-cp ~/.claude/plugins/cache/livepeek/livepeek/0.7.10/bin/livepeek ~/.local/bin/livepeek
+cp ~/.claude/plugins/cache/livepeek/livepeek/0.8.0/bin/livepeek ~/.local/bin/livepeek
 chmod +x ~/.local/bin/livepeek
 ```
 

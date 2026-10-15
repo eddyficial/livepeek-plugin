@@ -110,10 +110,10 @@ and type `/livepeek` (OpenCode) or ask it to "open livepeek".
 
 If you already have the Claude Code plugin, you can instead copy a wrapper from the installed
 plugin cache into a folder on your PATH. With the default Claude configuration,
-version 0.7.10 is under:
+version 0.8.0 is under:
 
 ```
-~/.claude/plugins/cache/livepeek/livepeek/0.7.10/bin/
+~/.claude/plugins/cache/livepeek/livepeek/0.8.0/bin/
 ```
 
 On Windows, copy `livepeek.cmd`. On macOS or Linux, copy `livepeek` and make it
