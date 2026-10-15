@@ -77,11 +77,14 @@ livepeek --install-skill
 The first line puts `livepeek` on your PATH. The second copies livepeek's
 skill to `~/.agents/skills/livepeek/`, the shared skills folder that
 OpenCode, Codex and Gemini CLI read, so your agent knows how to open the pane
-and check its own changes. Start a new agent session afterwards.
+and check its own changes. It also adds a `/livepeek` command for OpenCode
+in `~/.config/opencode/commands/`. Start a new agent session afterwards, then
+type `/livepeek` in OpenCode, or ask any agent to "open livepeek".
 
-- `--install-skill --project` puts it in this project's `.agents/skills/` instead.
-- `--install-skill --to <dir>` puts it in any other skills folder, such as
-  `~/.config/opencode/skills`.
+- `--install-skill --project` puts both in this project's `.agents/skills/`
+  and `.opencode/commands/` instead.
+- `--install-skill --to <dir>` puts only the skill in any other skills folder,
+  such as `~/.config/opencode/skills`.
 - An agent with no skills support can still use it: add a line to its
   instructions file (`AGENTS.md`, `CONVENTIONS.md`) pointing at the installed
   `SKILL.md`, or just ask it to run `livepeek`.
@@ -467,7 +470,7 @@ Everything livepeek does, so you can check it before installing. It collects and
 - **Shares with a one-time link.** If you explicitly share livepeek's server on your LAN, the QR/link exchanges its one-time token for an HttpOnly cookie before serving files.
 - **Starts your dev server, only if you ask.** Opening a Vite, Next, Expo or similar project runs that project's own `npm run` script, and picking a stopped project in the `p` list does the same. A dev server livepeek starts is stopped when it is replaced or livepeek exits.
 - **Writes a little local state** to `~/.livepeek/`: which panes are open (`panes/`, one small file per terminal), the folders you have previewed (`projects.json`), and whether the first-run welcome card still needs showing (`intro.json`). On first use, an existing `~/.peek/` is migrated when the new directory does not yet exist. Delete the folder to clear it.
-- **Writes one skill file, only if you ask.** `livepeek --install-skill` copies `SKILL.md` into `~/.agents/skills/livepeek/` (or the folder you name) for agents other than Claude Code. Delete that folder to remove it.
+- **Writes a skill file, only if you ask.** `livepeek --install-skill` copies `SKILL.md` into `~/.agents/skills/livepeek/` (or the folder you name) for agents other than Claude Code, and writes OpenCode's `/livepeek` command to `~/.config/opencode/commands/livepeek.md`. Delete those to remove them.
 - **Sends nothing anywhere.** No telemetry, no analytics, no account, no outbound requests of its own. The pages you preview make whatever requests they normally would.
 - **Has no hooks and no MCP server.** It adds one skill and one optional `livepeek` shell command.
 - **Clipboard, only when you press `c`.** Copying a frame uses PowerShell on Windows, `osascript` on macOS, and `wl-copy` or `xclip` on Linux. Nothing is read from the clipboard.

@@ -105,7 +105,8 @@ livepeek --install-skill
 
 The skill lands in `~/.agents/skills/livepeek/`, which OpenCode, Codex and
 Gemini CLI all read; `--to <dir>` puts it in another agent's skills folder.
-Start a new session in your agent and ask it to "open livepeek".
+OpenCode also gets a `/livepeek` command. Start a new session in your agent
+and type `/livepeek` (OpenCode) or ask it to "open livepeek".
 
 If you already have the Claude Code plugin, you can instead copy a wrapper from the installed
 plugin cache into a folder on your PATH. With the default Claude configuration,

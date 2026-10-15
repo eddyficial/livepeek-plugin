@@ -18,7 +18,7 @@ function safeEnv(extra = {}) {
 /** Run a livepeek script as a child with a clean, multiplexer-free environment. */
 function run(script, args, cwd) {
   const env = safeEnv({ HOME, USERPROFILE: HOME });
-  for (const k of ['TMUX', 'ZELLIJ', 'KITTY_LISTEN_ON', 'WEZTERM_PANE', 'WT_SESSION']) delete env[k];
+  for (const k of ['TMUX', 'ZELLIJ', 'KITTY_LISTEN_ON', 'WEZTERM_PANE', 'WT_SESSION', 'XDG_CONFIG_HOME']) delete env[k];
   const r = spawnSync(process.execPath, [path.join(SCRIPTS, script), ...args], {
     cwd, env, encoding: 'utf8', timeout: 30000, stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -87,14 +87,18 @@ await test('pane --install-skill writes the skill to ~/.agents/skills with the i
   assert(text.startsWith('---') && /\nname: livepeek\r?\n/.test(text), 'frontmatter missing\n' + text.slice(0, 200));
   assert(!text.includes('node "${CLAUDE_PLUGIN_ROOT}'), 'placeholder left in the launch command');
   assert(text.includes(`node "${ROOT.split(path.sep).join('/')}/scripts/pane.mjs"`), 'install path not filled in');
+  const command = fs.readFileSync(path.join(HOME, '.config', 'opencode', 'commands', 'livepeek.md'), 'utf8');
+  assert(command.startsWith('---\ndescription:') && command.includes('livepeek $ARGUMENTS'), 'OpenCode command\n' + command);
 });
 
 await test('pane --install-skill --project and --to choose the folder', () => {
   const dir = tmpdir('skill-project');
   eq(run('pane.mjs', ['--install-skill', '--project'], dir).status, 0, 'exit code (--project)');
   assert(fs.existsSync(path.join(dir, '.agents', 'skills', 'livepeek', 'SKILL.md')), 'no project skill');
+  assert(fs.existsSync(path.join(dir, '.opencode', 'commands', 'livepeek.md')), 'no project OpenCode command');
   eq(run('pane.mjs', ['--install-skill', '--to', 'custom'], dir).status, 0, 'exit code (--to)');
   assert(fs.existsSync(path.join(dir, 'custom', 'livepeek', 'SKILL.md')), 'no --to skill');
+  assert(!fs.existsSync(path.join(dir, 'custom', 'livepeek.md')), '--to wrote a command');
 });
 
 /** Run a bin/ wrapper (the .cmd on Windows) with --dry-run, as a shell would. */
