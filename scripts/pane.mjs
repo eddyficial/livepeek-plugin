@@ -157,7 +157,7 @@ let welcome = false;
 if (!URL_ARG && !fw && !STATIC) {
   welcome = true;
   STATIC = { dir: path.join(__dirname, 'welcome'), file: 'index.html' };
-  const quiet = flag('--quit') || arg('--eval', null) || arg('--snapshot', null);
+  const quiet = flag('--quit') || arg('--eval', null) || arg('--tap', null) || arg('--snapshot', null);
   if (!quiet) console.log(`Nothing to show in ${process.cwd()} yet - opening the welcome page.`);
   if (!quiet) console.log('Create an index.html or start a dev server here and the pane will pick it up.');
   if (!quiet) console.log('Or name a file or URL:  --file docs/spec.md   --url http://localhost:3000\n');
@@ -198,7 +198,7 @@ const PRESET = (arg('--compare', null) || '').split(',')[0] || PRESET_ARG
 // Remember what is being shown, so the pane's `p` picker can bring it back
 // later even when its dev server is not running. Control calls and the
 // welcome page are not projects.
-if (!welcome && !flag('--quit') && !flag('--dry-run') && !arg('--eval', null) && !arg('--snapshot', null)) {
+if (!welcome && !flag('--quit') && !flag('--dry-run') && !arg('--eval', null) && !arg('--tap', null) && !arg('--snapshot', null)) {
   const dir = STATIC ? STATIC.dir : root;
   projects.remember({
     dir,
@@ -240,6 +240,7 @@ const previewCmd = [
   '--slot', session.SLOT,
   '--root', root,
   ...(arg('--render', null) ? ['--render', arg('--render', null)] : []),
+  ...(flag('--safari') ? ['--safari'] : []),
   ...(welcome ? ['--watch-dir', process.cwd()] : []),
   ...serveArgs,
   ...(SNAPSHOT ? ['--snapshot', path.resolve(SNAPSHOT)] : []),
@@ -329,7 +330,7 @@ async function main() {
   // Control commands may reach a pane this terminal did not open: one
   // another terminal opened on this project (not for --quit), or the only
   // one there is (a --here view in a split the user made by hand).
-  const control = flag('--quit') || arg('--eval', null) || (SNAPSHOT && argv.length <= 2);
+  const control = flag('--quit') || arg('--eval', null) || arg('--tap', null) || (SNAPSHOT && argv.length <= 2);
   let why = null;
   // --quit stays with this terminal's own pane first: closing a view someone
   // else is looking at, and leaving this one open, is never what was meant
@@ -357,6 +358,21 @@ async function main() {
       if (r) { console.log(r.ok ? JSON.stringify(r.value) : 'error: ' + r.error); return; }
     }
     die('the pane did not answer within 8s - is it still running?');
+  }
+
+  // --tap <name>: tap a control in the pane - in Safari's chrome (--safari)
+  // by its label, else the first thing on the page with that text
+  const TAP = arg('--tap', null);
+  if (TAP) {
+    if (!open) die(noPaneMessage(why));
+    session.write({ ...open, tap: TAP, tapResult: null, rev: (open.rev || 0) + 1 });
+    const deadline = Date.now() + 20000;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, 120));
+      const r = session.read()?.tapResult;
+      if (r) { if (r.ok) return console.log(r.value); die('error: ' + r.error); }
+    }
+    die('the pane did not answer within 20s - is it still running?');
   }
 
   // --snapshot alone: ask the open pane to write what it is showing, and
@@ -421,6 +437,7 @@ async function main() {
       static: STATIC ? STATIC.dir : null,
       file: STATIC ? STATIC.file : null,
       preset: PRESET,
+      safari: flag('--safari'),
       snapshot: SNAPSHOT ? path.resolve(SNAPSHOT) : null,
       snapshotDone: SNAPSHOT ? null : open.snapshotDone,
       rev: (open.rev || 0) + 1,

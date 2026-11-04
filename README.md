@@ -423,6 +423,7 @@ the open pane, use the [keys](#keys) instead.
 | `livepeek --port 3000` | the dev server uses a non-default port |
 | `livepeek --no-serve` | a server is already running; don't start one |
 | `livepeek --file docs/spec.md` | show one file (Markdown or HTML) |
+| `livepeek --preset iphone-17-pro --safari` | draw Safari around an iPhone: toolbar, ••• menu, share sheet, Add to Home Screen, the Home Screen, and the site opened from it as a web app |
 | **How it looks** |  |
 | `livepeek --size 0.4` | pane width as a share of the terminal (default 0.34) |
 | `livepeek --horizontal` | split below instead of beside |
@@ -432,6 +433,7 @@ the open pane, use the [keys](#keys) instead.
 | `livepeek --snapshot out.png` | write what the pane shows to a PNG |
 | `livepeek --eval 'innerWidth'` | run a snippet in the shown page and print the result |
 | `livepeek --picked` | the element you last pointed at (`x`, then click), as JSON |
+| `livepeek --tap "Add to Home Screen"` | tap something: a Safari control by its name (`More`, `Share`, `View More`, `Add`, `Home`, `Safari`, `open:0` for the first Home Screen icon), else the first thing on the page with that text |
 | `livepeek --status` | what this terminal's pane shows, as JSON |
 | **Setup and checks** |  |
 | `livepeek --doctor` | check Node, browser, driver, terminal and graphics, and say what will work |
@@ -454,6 +456,17 @@ that drew it, so "this" needs no describing.
 ## Limits
 
 It drives a real browser, so it shows what a browser shows, and only that.
+
+- **Phone presets** present themselves as the phone: an iPhone preset reports
+  Safari on an iPhone, with touch and a mobile viewport, so pages that check
+  for one behave as on one. The engine underneath is still Chromium, so
+  Safari-only rendering differences don't show.
+- **Safari's chrome** (`--safari`) is drawn by livepeek, following iOS 26's
+  compact layout. It is a close sketch for walkthroughs and checking
+  Add to Home Screen flows, not Apple's pixels. A web app opened from its
+  Home Screen sees `navigator.standalone` and `(display-mode: standalone)` in
+  scripts (not in CSS), and shares Safari's storage, which a real iPhone
+  keeps separate.
 
 - **Phone apps** render their *web* build. Native-only modules are absent:
   `react-native-maps`, `expo-camera`, native Stripe, background location, push

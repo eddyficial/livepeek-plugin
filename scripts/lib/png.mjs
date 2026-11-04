@@ -5,7 +5,7 @@
 // than silently producing garbage pixels.
 import zlib from 'node:zlib';
 
-export function decodePng(buf) {
+export function decodePng(buf, { alpha = false } = {}) {
   if (buf.readUInt32BE(0) !== 0x89504e47) throw new Error('not a PNG');
 
   let pos = 8;
@@ -40,7 +40,8 @@ export function decodePng(buf) {
   const channels = colorType === 6 ? 4 : 3;
   const raw = zlib.inflateSync(Buffer.concat(idat));
   const stride = width * channels;
-  const out = Buffer.allocUnsafe(width * height * 3);
+  const outCh = alpha ? 4 : 3;
+  const out = Buffer.allocUnsafe(width * height * outCh);
 
   let prev = Buffer.alloc(stride);
   let rp = 0, op = 0;
@@ -80,12 +81,13 @@ export function decodePng(buf) {
         throw new Error(`bad PNG filter ${filter}`);
     }
 
-    // drop alpha; screenshots are already composited against the page
+    // drop alpha unless asked: screenshots are already composited against the page
     for (let x = 0; x < width; x++) {
       const s = x * channels;
       out[op++] = line[s];
       out[op++] = line[s + 1];
       out[op++] = line[s + 2];
+      if (alpha) out[op++] = channels === 4 ? line[s + 3] : 255;
     }
     prev = line;
   }

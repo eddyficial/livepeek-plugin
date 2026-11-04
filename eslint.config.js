@@ -14,7 +14,7 @@ export default [
   },
   {
     files: [
-      'scripts/presets.js', 'scripts/tui.mjs', 'scripts/lib/pick.mjs',
+      'scripts/presets.js', 'scripts/tui.mjs', 'scripts/lib/pick.mjs', 'scripts/lib/safari.mjs',
       'scripts/lib/textview.mjs', 'scripts/welcome/**/*.{js,mjs}', 'test/browser.mjs',
     ],
     languageOptions: { globals: globals.browser },

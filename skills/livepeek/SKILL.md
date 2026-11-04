@@ -69,6 +69,8 @@ Options, added when the user asks:
 | `--snapshot out.png` | write what the open pane is showing to a PNG |
 | `--eval '<js>'` | run a snippet in the shown page, print the JSON result |
 | `--picked` | the element the user last pointed at in the pane, as JSON |
+| `--safari` | with an iPhone preset: draw Safari around the page (toolbar, ••• menu, share sheet, Add to Home Screen, Home Screen, the site opened as a web app) |
+| `--tap '<name>'` | tap a Safari control by name (`More`, `Share`, `View More`, `Add to Home Screen`, `Add`, `Cancel`, `Open as Web App`, `Home`, `Safari`, `open:0` for the first Home Screen icon), else the first page element with that text |
 | `--compare a,b` | two panes side by side, one per preset (`desktop,iphone-15-pro`). `--quit` and `--snapshot` reach the first while it is open; the user presses `q` in the second |
 | `--status` | one line of JSON about this terminal's pane: `target`, `preset`, `errors`, `host`, `pid` |
 | `--doctor` | diagnose: Node, browser, driver, multiplexer, graphics. Run this first when the pane will not open or renders garbage |
@@ -100,6 +102,30 @@ livepeek --eval '[innerWidth, innerHeight]'
 
 Both need a pane to be open. If the user said "change X" and X is visible in
 the pane, the loop is: edit, wait ~2s, snapshot, look, report what you see.
+
+## Phones, and walking through Safari
+
+Phone and tablet presets present themselves as the device (user agent,
+platform, touch, mobile viewport), so a page that checks for an iPhone or a
+touch screen behaves as on one. Nothing needs patching in the page.
+
+For anything that happens in Safari itself, such as putting a web app on the
+Home Screen, launch with `--safari` on an iPhone preset and drive it with
+`--tap`, snapshotting each step:
+
+```bash
+livepeek --url https://example.com --preset iphone-17-pro --safari
+livepeek --tap More && livepeek --tap Share && livepeek --tap "View More"
+livepeek --tap "Add to Home Screen" && livepeek --tap Add    # lands on the Home Screen
+livepeek --tap open:0                                         # opens it as a web app
+livepeek --tap Home && livepeek --tap Safari                  # back to Safari
+```
+
+Safari's chrome is drawn by livepeek after iOS 26's compact layout: say so if
+the screenshots are for people to follow, since it is close but not Apple's
+own pixels. Tapping a Home Screen icon opens the site at its manifest's
+`start_url`, which may make the site do real work (sign-ins, invite
+activation); point at a local or test copy for that step.
 
 ## When the user says "this"
 

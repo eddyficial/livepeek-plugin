@@ -46,6 +46,7 @@ import { lanAddresses, phoneUrl, reachable } from './lib/lan.mjs';
 import { qrHalfBlocks } from './lib/qr.mjs';
 import { createFrameSettler } from './lib/frame.mjs';
 import { deviceProfile, applyDeviceProfile } from './lib/emulate.mjs';
+import { safariBar, initialSafari, safariStep, safariHtml, pageInfoProbe, STANDALONE_SCRIPT } from './lib/safari.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ESC = '\x1b';
@@ -87,6 +88,8 @@ if (SLOT_ARG) {
 // Write the frame being shown to this PNG on every repaint, so an agent can
 // look at the pane. Also requestable after the fact via the session file.
 const SNAPSHOT = arg('--snapshot', null);
+// Safari's chrome around iPhone presets: toolbar, share sheet, Add to Home Screen (lib/safari.mjs)
+const SAFARI_ARG = argv.includes('--safari');
 const WATCH_DIR = arg('--watch-dir', null);   // welcome page: switch when this folder gets content
 // the project folder on show, published so a control command run from that
 // project finds this pane even when another terminal opened it
@@ -146,8 +149,130 @@ const device = () => {
 };
 const vp = () => {
   const d = device();
-  return landscape ? { width: d.h, height: d.w } : { width: d.w, height: d.h };
+  if (landscape) return { width: d.h, height: d.w };
+  // Safari's bottom bar takes its strip off the page; a web app has the lot
+  const bar = safariActive() && safari.mode === 'safari' ? safariBar(d) : 0;
+  return { width: d.w, height: d.h - bar };
 };
+
+// ---------------------------------------------------------------- safari ----
+let safari = { ...initialSafari(), on: SAFARI_ARG };
+let shellTab = null;        // the tab Safari's chrome is drawn in
+let shellKey = '';          // what it was last drawn for
+let shellImg = null;        // that drawing, RGBA at SHOT_SCALE
+let standaloneId = null;    // the script that makes the page a Home Screen web app
+let lastScreen = null;      // the whole phone screen last painted: page plus chrome
+let swallowRelease = false; // a press the chrome took; its release is the chrome's too
+
+/** Safari is drawn: asked for, an iPhone, upright, and a picture to draw it in. */
+function safariActive() {
+  return safari.on && device().os === 'iOS' && !landscape && renderMode !== 'text';
+}
+
+const hostOf = (href) => { try { return new URL(href).host.replace(/^www\./, ''); } catch { return ''; } };
+
+/** The page's screenshot with Safari's chrome laid over it, as the whole screen. */
+async function safariScreen(shotPng) {
+  const d = device();
+  const W = d.w * SHOT_SCALE, H = d.h * SHOT_SCALE;
+  const pageImg = decodePng(shotPng);
+  // the strip behind the floating bar takes the colour of the page's bottom edge
+  const tint = [0, 0, 0];
+  {
+    const y = pageImg.height - 1;
+    for (let x = 0; x < pageImg.width; x++) for (let c = 0; c < 3; c++) tint[c] += pageImg.data[(y * pageImg.width + x) * 3 + c];
+    for (let c = 0; c < 3; c++) tint[c] /= Math.max(1, pageImg.width);
+  }
+  const dark = 0.2126 * tint[0] + 0.7152 * tint[1] + 0.0722 * tint[2] < 128;
+  const view = { ...safari, host: hostOf(pageHref) };
+  const key = JSON.stringify([view.mode, view.sheet, view.webApp, view.host, view.apps.map(a => a.name + (a.icon?.length || 0)), view.info?.name, view.info?.url, view.info?.icon?.length, d.w, d.h, dark]);
+  if (key !== shellKey || !shellImg) {
+    if (!shellTab) shellTab = await browser.newPage({ viewport: { width: d.w, height: d.h }, deviceScaleFactor: SHOT_SCALE });
+    const v = shellTab.viewportSize();
+    if (!v || v.width !== d.w || v.height !== d.h) await shellTab.setViewportSize({ width: d.w, height: d.h });
+    await shellTab.setContent(safariHtml(view, { w: d.w, h: d.h, bar: safariBar(d), dark, chin: !!d.chin }), { waitUntil: 'load' });
+    shellImg = decodePng(await shellTab.screenshot({ type: 'png', omitBackground: true }), { alpha: true });
+    shellKey = key;
+  }
+  const data = Buffer.alloc(W * H * 3);
+  if (safari.mode !== 'home') {
+    const rows = Math.min(H, pageImg.height), cols = Math.min(W, pageImg.width);
+    for (let y = 0; y < rows; y++) pageImg.data.copy(data, y * W * 3, y * pageImg.width * 3, y * pageImg.width * 3 + cols * 3);
+    for (let y = rows; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 3; data[i] = tint[0]; data[i + 1] = tint[1]; data[i + 2] = tint[2]; }
+  }
+  if (shellImg.width === W && shellImg.height === H) {
+    const s = shellImg.data;
+    for (let p = 0, q = 0; p < W * H * 3; p += 3, q += 4) {
+      const a = s[q + 3];
+      if (a === 0) continue;
+      if (a === 255) { data[p] = s[q]; data[p + 1] = s[q + 1]; data[p + 2] = s[q + 2]; continue; }
+      const k = a / 255;
+      data[p] += (s[q] - data[p]) * k; data[p + 1] += (s[q + 1] - data[p + 1]) * k; data[p + 2] += (s[q + 2] - data[p + 2]) * k;
+    }
+  }
+  return { img: { width: W, height: H, data }, key };
+}
+
+/** What the chrome has at a screen point: its action and label, or null for the page. */
+async function safariHitAt(pt) {
+  if (!shellTab) return null;
+  try {
+    return await shellTab.evaluate(([x, y]) => {
+      const el = document.elementFromPoint(x, y)?.closest('[data-hit]');
+      return el ? { action: el.getAttribute('data-hit'), label: el.getAttribute('data-label') } : null;
+    }, [pt.x, pt.y]);
+  } catch { return null; }
+}
+
+/** One tap on Safari's chrome: the next state, and what that does to the real page. */
+async function safariAct(action) {
+  const before = safari.mode;
+  const { state, effect } = safariStep(safari, action);
+  safari = state;
+  if (effect?.info) { try { safari.info = await page.evaluate(pageInfoProbe); } catch { safari.info = { url: pageHref, host: hostOf(pageHref), title: '', name: hostOf(pageHref) }; } }
+  try {
+    if (effect?.back) await page.goBack({ timeout: 10000 });
+    if (effect?.reload) await page.reload({ timeout: 10000 });
+    if (effect?.leaveApp && standaloneId && cdp) {
+      await cdp.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: standaloneId });
+      standaloneId = null;
+      if (safari.returnUrl) { await sizePage(); await page.goto(safari.returnUrl, { waitUntil: 'domcontentloaded', timeout: 30000 }); }
+      safari.returnUrl = null;
+    }
+    if (effect?.open) {
+      if (effect.standalone && cdp && !standaloneId) {
+        safari.returnUrl = before === 'app' ? safari.returnUrl : page.url();
+        await cdp.send('Page.enable');     // this session's own; scripts it adds need it
+        standaloneId = (await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: STANDALONE_SCRIPT })).identifier;
+      }
+      await sizePage();     // a web app has the whole screen; load at that size
+      await page.goto(effect.open, { waitUntil: 'domcontentloaded', timeout: 30000 });
+    }
+  } catch { /* mid-navigation: the next frame shows wherever it got to */ }
+  dirty = true;
+  await applyViewport();
+}
+
+/** --tap: a control in Safari's chrome by its label, else text on the page. */
+async function tapByName(name) {
+  const want = String(name).trim().toLowerCase();
+  if (safariActive()) {
+    await tick(true);     // the chrome is drawn for the current state
+    const found = shellTab && await shellTab.evaluate((w) => {
+      const all = [...document.querySelectorAll('[data-hit]')];
+      const el = all.find(e => e.getAttribute('data-hit') === w)     // an action, e.g. open:1
+        || all.find(e => e.getAttribute('data-label').toLowerCase() === w)
+        || all.find(e => e.getAttribute('data-label').toLowerCase().includes(w));
+      return el ? { action: el.getAttribute('data-hit'), label: el.getAttribute('data-label') } : null;
+    }, want);
+    if (found) { await safariAct(found.action); return { ok: true, value: `tapped ${found.label} (Safari)` }; }
+    if (safari.mode === 'home' || safari.sheet) return { ok: false, error: `nothing called "${name}" on screen` };
+  }
+  const el = page.getByText(String(name), { exact: false }).first();
+  await el.click({ timeout: 4000 });
+  await tick(true);
+  return { ok: true, value: `tapped "${name}" on the page` };
+}
 
 // ------------------------------------------------------------- browser ----
 /**
@@ -238,6 +363,7 @@ let cw = 10, ch = 20, termBg = [12, 12, 12];
 let caps = { sixel: false, kitty: false, tmux: false };
 let tickTimer = null;
 let lastShot = null;
+let lastScreenKey = '';  // the Safari chrome state last painted
 let pendingWipe = null;   // { from, to }: rows an overlay left text in under the image
 let statusMsg = 'starting';
 let errors = [];           // console errors and uncaught exceptions on the page
@@ -465,6 +591,7 @@ function publish(extra = {}) {
     snapshotDone,
     errors: errors.length,
     picked,
+    safari: safari.on,
     ...extra,
   });
 }
@@ -528,6 +655,18 @@ async function applyControl(s) {
     try { evalResult = { ok: true, value: await page.evaluate(s.eval) }; }
     catch (e) { evalResult = { ok: false, error: String(e.message || e) }; }
     publish({ eval: null, evalResult });
+    if (!s.snapshot && s.target === currentTarget && s.preset === devices[deviceIdx]?.id && !s.static) return;
+  }
+
+  if (s.safari !== undefined && !!s.safari !== safari.on) {
+    safari = { ...safari, on: !!s.safari };
+    await applyViewport();
+  }
+  if (s.tap) {
+    let tapResult;
+    try { tapResult = await tapByName(s.tap); }
+    catch (e) { tapResult = { ok: false, error: String(e.message || e).split('\n')[0] }; }
+    publish({ tap: null, tapResult });
     if (!s.snapshot && s.target === currentTarget && s.preset === devices[deviceIdx]?.id && !s.static) return;
   }
 
@@ -1148,7 +1287,7 @@ function render(L, shotPng) {
   const geom = L.geom;
   const sw = Math.max(1, Math.round(geom.screenW * L.scale));
   const sh = Math.max(1, Math.round(geom.screenH * L.scale));
-  let shot = resize(decodePng(shotPng), sw, sh);
+  let shot = resize(Buffer.isBuffer(shotPng) ? decodePng(shotPng) : shotPng, sw, sh);
   // Sixel only: kitty graphics are drawn at real pixels and stay sharp.
   // Windows Terminal stretches sixels from 10x20 pixel cells to the real
   // ones, so it gets more (see sharpen in lib/png.mjs).
@@ -1175,7 +1314,8 @@ let lastComposed = null;
 function writeSnapshot(file) {
   try {
     fs.mkdirSync(path.dirname(file), { recursive: true });   // e.g. .livepeek/ on first use
-    if (lastShot) fs.writeFileSync(file, lastShot);          // page screenshot, full res
+    if (safariActive() && lastScreen) fs.writeFileSync(file, encodePng(lastScreen));   // page and Safari, full res
+    else if (lastShot) fs.writeFileSync(file, lastShot);     // page screenshot, full res
     else if (lastComposed) fs.writeFileSync(file, encodePng(lastComposed));
   } catch { /* a snapshot is never worth crashing the view */ }
 }
@@ -1269,6 +1409,14 @@ async function paint(force) {
     }
 
     let changed = !lastShot || Buffer.compare(shot, lastShot) !== 0;
+    let frame = shot;
+    if (safariActive() && renderMode !== 'text') {
+      const sc = await safariScreen(shot);
+      if (gen !== viewGen) return;
+      if (sc.key !== lastScreenKey) { changed = true; lastScreenKey = sc.key; }
+      frame = sc.img;
+      lastScreen = sc.img;
+    }
 
     if (renderMode === 'text') {
       // the picture is only kept for snapshots; what we paint is the DOM
@@ -1292,7 +1440,7 @@ async function paint(force) {
         drawHeader(L);
         dirty = false;
       }
-      render(L, shot);
+      render(L, frame);
       if (menuOpen) drawMenu(L);
       if (overlay) drawOverlay(L);   // a new frame paints over it otherwise
     }
@@ -1306,7 +1454,7 @@ async function paint(force) {
 
 // ----------------------------------------------------------- page input ----
 /** Terminal cell -> page coordinate, or null if the cell isn't over the screen. */
-function cellToPage(col, row) {
+function cellToPage(col, row, bounds = vp()) {
   const L = lastLayout;
   if (!L || !L.screenRect) return null;
 
@@ -1318,8 +1466,7 @@ function cellToPage(col, row) {
 
   const x = (ix - L.screenRect.x) / L.scale;
   const y = (iy - L.screenRect.y) / L.scale;
-  const v = vp();
-  if (x < 0 || y < 0 || x >= v.width || y >= v.height) return null;
+  if (x < 0 || y < 0 || x >= bounds.width || y >= bounds.height) return null;
   return { x, y };
 }
 
@@ -1374,6 +1521,22 @@ async function handleMouse(code, col, row, press) {
       }
     }
     return;
+  }
+
+  // Safari's chrome takes the taps that land on it; while a sheet or the Home
+  // Screen covers the page, it takes them all
+  if (safariActive()) {
+    const plainPress = press && !(code & 32) && !(code & 64) && (code & 3) === 0;
+    const spt = cellToPage(col, row, { width: device().w, height: device().h });
+    if (safari.mode === 'home' || safari.sheet) {
+      if (plainPress && spt) { const h = await safariHitAt(spt); if (h) await safariAct(h.action); }
+      return;
+    }
+    if (plainPress && spt) {
+      const h = await safariHitAt(spt);
+      if (h) { swallowRelease = true; await safariAct(h.action); return; }
+    }
+    if (!press && swallowRelease) { swallowRelease = false; return; }
   }
 
   // Everything below talks to the page as a real pointer would: hover,

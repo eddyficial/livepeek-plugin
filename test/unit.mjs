@@ -367,3 +367,31 @@ await test('phone presets present themselves as their device; web presets do not
   eq(deviceProfile({ os: 'Web', name: 'Desktop 1440' }), null, 'web preset');
   eq(deviceProfile({ os: 'Canvas', name: 'Game 16:9 720p' }), null, 'game preset');
 });
+
+await test('safari: ••• → Share → View More → Add to Home Screen → Add → open as a web app', async () => {
+  const { initialSafari, safariStep, safariHtml, safariBar } = await lib('safari.mjs');
+  let s = initialSafari();
+  const step = (a) => { const r = safariStep(s, a); s = r.state; return r.effect; };
+  step('more'); eq(s.sheet, 'menu', 'menu open');
+  eq(step('share'), { info: true }, 'share asks for the page info');
+  s.info = { name: 'Demo', host: 'demo.test', url: 'https://demo.test/page', start: 'https://demo.test/start', icon: null };
+  step('view-more'); eq(s.sheet, 'share-more', 'full action list');
+  assert(safariHtml(s, { w: 402, h: 874, bar: 78, dark: false, chin: false }).includes('data-hit="add-to-home"'), 'Add to Home Screen is offered');
+  step('add-to-home'); eq(s.sheet, 'add', 'add sheet');
+  step('add'); eq([s.mode, s.apps.length, s.apps[0].url], ['home', 1, 'https://demo.test/start'], 'icon on the Home Screen, opening at start_url');
+  eq(step('open:0'), { open: 'https://demo.test/start', standalone: true }, 'opens standalone');
+  eq(s.mode, 'app', 'web app mode');
+  eq(step('home'), { leaveApp: true }, 'leaving the app restores Safari');
+  step('safari'); eq(s.mode, 'safari', 'back in Safari');
+  eq(safariBar({ chin: true }) < safariBar({}), true, 'home-button phones have a shorter bar');
+});
+
+await test('safari: a bookmark (Open as Web App off) opens in Safari', async () => {
+  const { initialSafari, safariStep } = await lib('safari.mjs');
+  let s = { ...initialSafari(), info: { name: 'B', url: 'https://b.test/x', start: 'https://b.test/' } };
+  s = safariStep(s, 'add-to-home').state;
+  s = safariStep(s, 'toggle-webapp').state;
+  s = safariStep(s, 'add').state;
+  const r = safariStep(s, 'open:0');
+  eq([r.state.mode, r.effect], ['safari', { open: 'https://b.test/x', standalone: false }], 'bookmark opens the page itself in Safari');
+});
