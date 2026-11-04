@@ -54,7 +54,7 @@ if (flag('--status')) {
   }
   const p = r.pane;
   console.log(JSON.stringify({ slot: session.SLOT, target: p.target, static: p.static || null, file: p.file || null,
-    preset: p.preset, errors: p.errors || 0, host: p.host, pid: p.pid }));
+    preset: p.preset, errors: p.errors || 0, host: p.host, pid: p.pid, render: p.render || null }));
   process.exit(0);
 }
 

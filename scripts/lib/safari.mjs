@@ -14,8 +14,12 @@
  * owns the state machine, the geometry and the markup.
  */
 
-/** Height of Safari's bottom bar, in logical px, below the page. */
+/** An iPad: Safari's bar runs along the top there, with Share at its right. */
+export const safariOnTop = (device) => device.os === 'iPadOS';
+
+/** Height of Safari's bar, in logical px: below the page on an iPhone, above it on an iPad. */
 export function safariBar(device) {
+  if (safariOnTop(device)) return 56;
   return device.chin ? 56 : 78;
 }
 
@@ -107,6 +111,8 @@ const esc = (t) => String(t ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '
 // Simple line icons in the SF Symbols manner, 24px boxes.
 const ICON = {
   back: '<path d="M15 4 7 12l8 8" />',
+  forward: '<path d="m9 4 8 8-8 8" />',
+  sidebar: '<rect x="3" y="4.5" width="18" height="15" rx="3" /><path d="M9 4.5v15" />',
   dots: '<circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none"/>',
   reload: '<path d="M19 12a7 7 0 1 1-2.1-5" /><path d="M19 4v4h-4" />',
   share: '<path d="M12 15V3M8 6.5 12 3l4 3.5M8.5 10H6v11h12V10h-2.5" />',
@@ -142,7 +148,7 @@ function appIcon(app, size) {
  * background wherever the real page shows through. Every tappable thing
  * carries data-hit (the action) and data-label (what --tap can name it by).
  */
-export function safariHtml(state, { w, h, bar, dark, chin }) {
+export function safariHtml(state, { w, h, bar, dark, chin, ipad = false }) {
   const info = state.info || {};
   const hit = (action, label) => `data-hit="${action}" data-label="${esc(label)}"`;
   const glass = dark ? 'rgba(44,44,46,.97)' : 'rgba(252,252,253,.97)';  // nearly solid: the page behind can't be blurred from here
@@ -155,13 +161,52 @@ export function safariHtml(state, { w, h, bar, dark, chin }) {
   const parts = [];
 
   if (state.mode === 'home') {
-    const cols = 4, cell = (w - 28) / cols;
+    const cols = ipad ? 6 : 4, size = ipad ? 72 : 62, cell = (w - (ipad ? 80 : 28)) / cols;
     const apps = state.apps.map((a, i) => {
-      const x = 14 + (i % cols) * cell, y = 24 + Math.floor(i / cols) * 104;
-      return `<div class="app" ${hit(`open:${i}`, a.name)} style="left:${x}px;top:${y}px;width:${cell}px">${appIcon(a, 62)}<span>${esc(a.name)}</span></div>`;
+      const x = (ipad ? 40 : 14) + (i % cols) * cell, y = (ipad ? 40 : 24) + Math.floor(i / cols) * (size + 42);
+      return `<div class="app" ${hit(`open:${i}`, a.name)} style="left:${x}px;top:${y}px;width:${cell}px">${appIcon(a, size)}<span>${esc(a.name)}</span></div>`;
     }).join('');
+    const dock = ipad ? `left:50%;right:auto;transform:translateX(-50%);width:${size + 36}px;padding-left:18px` : '';
     parts.push(`<div class="wall"></div>${apps}
-      <div class="dock" style="bottom:${chin ? 8 : 22}px"><div class="app dockapp" ${hit('safari', 'Safari')}><div style="width:62px;height:62px">${SAFARI_ICON}</div></div></div>`);
+      <div class="dock" style="bottom:${chin ? 8 : 22}px;${dock}"><div class="app dockapp" ${hit('safari', 'Safari')}><div style="width:${size}px;height:${size}px">${SAFARI_ICON}</div></div></div>`);
+  } else if (state.mode === 'safari' && ipad) {
+    // the bar along the top, Share at its right; the share list is a pop-up under it
+    const y = 4, bh = bar - 8;
+    parts.push(`
+      <div class="tbar" style="height:${bar}px"></div>
+      <div class="tb" ${hit('inert', 'Sidebar')} style="left:12px;top:${y}px;height:${bh}px">${svg('sidebar')}</div>
+      <div class="tb" ${hit('back', 'Back')} style="left:60px;top:${y}px;height:${bh}px">${svg('back')}</div>
+      <div class="tb dim" ${hit('inert', 'Forward')} style="left:104px;top:${y}px;height:${bh}px">${svg('forward')}</div>
+      <div class="btn pill" ${hit('inert', 'Address')} style="left:${Math.round(w * 0.27)}px;right:${Math.round(w * 0.27)}px;top:${y + 2}px;height:${bh - 4}px;box-shadow:none"><span class="host">${esc(info.host || state.host || '')}</span><span class="rl" ${hit('reload', 'Reload')}>${svg('reload', 18)}</span></div>
+      <div class="tb" ${hit('share', 'Share')} style="right:104px;top:${y}px;height:${bh}px">${svg('share')}</div>
+      <div class="tb" ${hit('inert', 'New Tab')} style="right:58px;top:${y}px;height:${bh}px">${svg('plus')}</div>
+      <div class="tb" ${hit('inert', 'Tabs')} style="right:12px;top:${y}px;height:${bh}px">${svg('tabs')}</div>`);
+
+    if (state.sheet === 'share' || state.sheet === 'share-more') {
+      const more = state.sheet === 'share-more';
+      const people = [['AirDrop', '#1c9bf0'], ['Messages', '#34c759'], ['Mail', '#2f7cf6'], ['Notes', '#ffcc00'], ['Reminders', '#ff9f0a']];
+      const actions = more
+        ? [['Copy', 'copy'], ['Add to Reading List', 'glasses'], ['Add Bookmark', 'book'], ['Add to Favorites', 'star'], ['Add to Quick Note', 'note'], ['Find on Page', 'find'], ['Add to Home Screen', 'addHome'], ['Markup', 'markup'], ['Print', 'print']]
+        : [['Copy', 'copy'], ['Add to Reading List', 'glasses'], ['Add Bookmark', 'book'], ['Add to Favorites', 'star']];
+      const icon = info.icon ? `<img src="${esc(info.icon)}" style="width:44px;height:44px;border-radius:10px;object-fit:cover">` : appIcon({ name: info.host }, 44);
+      parts.unshift(`<div class="backdrop" ${hit('dismiss', 'Close')}></div>`);
+      parts.push(`<div class="pop" style="top:${bar + 4}px;right:72px">
+        <div class="shead">${icon}<div class="st"><b>${esc(info.title || info.host)}</b><span>${esc(info.host)} <i style="color:${blue};font-style:normal">Options ›</i></span></div></div>
+        <div class="people">${people.map(([n, c]) => `<div class="pp" ${hit('inert', n)}><div class="pc" style="background:${c}">${svg('share', 22, 'style="color:#fff"')}</div><span>${n}</span></div>`).join('')}</div>
+        <div class="card">${actions.map(([l, ic]) => `<div class="ai" ${hit(l === 'Add to Home Screen' ? 'add-to-home' : 'inert', l)}><span>${l}</span>${svg(ic, 21)}</div>`).join('')}
+          ${more ? '' : `<div class="ai vm" ${hit('view-more', 'View More')}><span style="color:${blue}">View More</span></div>`}</div>
+      </div>`);
+    }
+
+    if (state.sheet === 'add') {
+      parts.unshift(`<div class="backdrop dim"></div>`);
+      parts.push(`<div class="sheet add form" style="top:${Math.round(h * 0.14)}px;left:${Math.round((w - 540) / 2)}px;width:540px">
+        <div class="nav"><span class="nb" ${hit('dismiss', 'Cancel')}>Cancel</span><b>Add to Home Screen</b><span class="nb strong" ${hit('add', 'Add')}>Add</span></div>
+        <div class="card addcard"><div class="row">${appIcon({ name: info.name, icon: info.icon }, 60)}<div class="fields"><div class="name">${esc(info.name)}</div><div class="url">${esc(state.webApp ? (info.start || info.url) : info.url)}</div></div></div></div>
+        <div class="card"><div class="ai" ${hit('toggle-webapp', 'Open as Web App')}><span>Open as Web App</span><div class="tog ${state.webApp ? 'on' : ''}"><div></div></div></div></div>
+        <p class="cap">An icon will be added to your Home Screen so you can quickly access this website.</p>
+      </div>`);
+    }
   } else if (state.mode === 'safari') {
     const capY = h - bar + (chin ? 4 : 8);
     parts.push(`
@@ -217,6 +262,11 @@ export function safariHtml(state, { w, h, bar, dark, chin }) {
   .backdrop.dim { background: rgba(0,0,0,.32); }
   .btn { position: absolute; height: 48px; background: ${glass}; border: .5px solid ${dark ? 'rgba(255,255,255,.14)' : 'rgba(0,0,0,.08)'}; box-shadow: 0 6px 20px rgba(0,0,0,.18); display: flex; align-items: center; justify-content: center; color: ${ink}; backdrop-filter: blur(20px); }
   .round { width: 48px; border-radius: 24px; }
+  .tbar { position: absolute; left: 0; right: 0; top: 0; background: ${glass}; border-bottom: .5px solid ${line}; }
+  .tb { position: absolute; width: 40px; display: flex; align-items: center; justify-content: center; color: ${blue}; }
+  .tb.dim { opacity: .35; }
+  .pop { position: absolute; width: 400px; background: ${sheetBg}; border-radius: 22px; padding: 14px 14px 0; box-shadow: 0 12px 48px rgba(0,0,0,.35); }
+  .sheet.form { right: auto; bottom: auto; border-radius: 16px; padding-bottom: 16px; }
   .pill { border-radius: 24px; padding: 0 14px 0 18px; font-size: 16px; }
   .host { flex: 1; text-align: center; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .rl { display: flex; color: ${ink}; }

@@ -46,7 +46,7 @@ import { lanAddresses, phoneUrl, reachable } from './lib/lan.mjs';
 import { qrHalfBlocks } from './lib/qr.mjs';
 import { createFrameSettler } from './lib/frame.mjs';
 import { deviceProfile, applyDeviceProfile } from './lib/emulate.mjs';
-import { safariBar, initialSafari, safariStep, safariHtml, pageInfoProbe, STANDALONE_SCRIPT } from './lib/safari.mjs';
+import { safariBar, safariOnTop, initialSafari, safariStep, safariHtml, pageInfoProbe, STANDALONE_SCRIPT } from './lib/safari.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ESC = '\x1b';
@@ -164,10 +164,13 @@ let standaloneId = null;    // the script that makes the page a Home Screen web 
 let lastScreen = null;      // the whole phone screen last painted: page plus chrome
 let swallowRelease = false; // a press the chrome took; its release is the chrome's too
 
-/** Safari is drawn: asked for, an iPhone, upright, and a picture to draw it in. */
+/** Safari is drawn: asked for, an iPhone or iPad, upright, and a picture to draw it in. */
 function safariActive() {
-  return safari.on && device().os === 'iOS' && !landscape && renderMode !== 'text';
+  return safari.on && (device().os === 'iOS' || device().os === 'iPadOS') && !landscape && renderMode !== 'text';
 }
+
+/** How far down the screen the page starts: below Safari's bar on an iPad. */
+const pageTop = () => (safariActive() && safari.mode === 'safari' && safariOnTop(device()) ? safariBar(device()) : 0);
 
 const hostOf = (href) => { try { return new URL(href).host.replace(/^www\./, ''); } catch { return ''; } };
 
@@ -190,15 +193,16 @@ async function safariScreen(shotPng) {
     if (!shellTab) shellTab = await browser.newPage({ viewport: { width: d.w, height: d.h }, deviceScaleFactor: SHOT_SCALE });
     const v = shellTab.viewportSize();
     if (!v || v.width !== d.w || v.height !== d.h) await shellTab.setViewportSize({ width: d.w, height: d.h });
-    await shellTab.setContent(safariHtml(view, { w: d.w, h: d.h, bar: safariBar(d), dark, chin: !!d.chin }), { waitUntil: 'load' });
+    await shellTab.setContent(safariHtml(view, { w: d.w, h: d.h, bar: safariBar(d), dark, chin: !!d.chin, ipad: safariOnTop(d) }), { waitUntil: 'load' });
     shellImg = decodePng(await shellTab.screenshot({ type: 'png', omitBackground: true }), { alpha: true });
     shellKey = key;
   }
   const data = Buffer.alloc(W * H * 3);
   if (safari.mode !== 'home') {
-    const rows = Math.min(H, pageImg.height), cols = Math.min(W, pageImg.width);
-    for (let y = 0; y < rows; y++) pageImg.data.copy(data, y * W * 3, y * pageImg.width * 3, y * pageImg.width * 3 + cols * 3);
-    for (let y = rows; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 3; data[i] = tint[0]; data[i + 1] = tint[1]; data[i + 2] = tint[2]; }
+    const top = pageTop() * SHOT_SCALE;
+    const rows = Math.min(H - top, pageImg.height), cols = Math.min(W, pageImg.width);
+    for (let y = 0; y < rows; y++) pageImg.data.copy(data, (y + top) * W * 3, y * pageImg.width * 3, y * pageImg.width * 3 + cols * 3);
+    for (let y = rows + top; y < H; y++) for (let x = 0; x < W; x++) { const i = (y * W + x) * 3; data[i] = tint[0]; data[i + 1] = tint[1]; data[i + 2] = tint[2]; }
   }
   if (shellImg.width === W && shellImg.height === H) {
     const s = shellImg.data;
@@ -592,6 +596,8 @@ function publish(extra = {}) {
     errors: errors.length,
     picked,
     safari: safari.on,
+    // how the picture is drawn, so "it looks soft" can be diagnosed from outside
+    render: renderMode && { mode: renderMode, cell: [cw, ch], cellFrom: caps?.cellFrom ?? null, scale: lastLayout?.scale ?? null, image: lastLayout ? [lastLayout.W, lastLayout.H] : null, pane: lastLayout ? [lastLayout.cols, lastLayout.rows] : null },
     ...extra,
   });
 }
@@ -1454,7 +1460,7 @@ async function paint(force) {
 
 // ----------------------------------------------------------- page input ----
 /** Terminal cell -> page coordinate, or null if the cell isn't over the screen. */
-function cellToPage(col, row, bounds = vp()) {
+function cellToPage(col, row, bounds = null) {
   const L = lastLayout;
   if (!L || !L.screenRect) return null;
 
@@ -1465,8 +1471,10 @@ function cellToPage(col, row, bounds = vp()) {
   const iy = (row - L.top + 0.5) * pxPerColY;
 
   const x = (ix - L.screenRect.x) / L.scale;
-  const y = (iy - L.screenRect.y) / L.scale;
-  if (x < 0 || y < 0 || x >= bounds.width || y >= bounds.height) return null;
+  // on an iPad the page starts below Safari's bar; a screen point (bounds given) doesn't move
+  const y = (iy - L.screenRect.y) / L.scale - (bounds ? 0 : pageTop());
+  const b = bounds || vp();
+  if (x < 0 || y < 0 || x >= b.width || y >= b.height) return null;
   return { x, y };
 }
 
