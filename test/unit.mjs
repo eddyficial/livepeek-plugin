@@ -354,3 +354,16 @@ await test('servesOtherProject spots another project\'s Vite by its 403', async 
   } finally { server.close(); }
   eq(await servesOtherProject(port, TMP), false, 'nothing listening');
 });
+
+await test('phone presets present themselves as their device; web presets do not', async () => {
+  const { deviceProfile } = await lib('emulate.mjs');
+  const iphone = deviceProfile({ os: 'iOS', name: 'Apple iPhone 15 Pro' });
+  assert(/iPhone/.test(iphone.userAgent) && iphone.platform === 'iPhone' && iphone.mobile && iphone.touchPoints > 1, 'iPhone identity');
+  const ipad = deviceProfile({ os: 'iPadOS', name: 'Apple iPad mini' });
+  assert(ipad.platform === 'MacIntel' && ipad.touchPoints > 1 && !ipad.mobile, 'an iPad says Mac with touch, as Safari does');
+  const pixel = deviceProfile({ os: 'Android', name: 'Google Pixel 8 / 9' }, '156');
+  assert(/Android.*Chrome\/156\.0\.0\.0 Mobile/.test(pixel.userAgent), 'Android user agent carries the real Chrome version');
+  eq(pixel.metadata.model, 'Pixel 8 / 9', 'client hints model');
+  eq(deviceProfile({ os: 'Web', name: 'Desktop 1440' }), null, 'web preset');
+  eq(deviceProfile({ os: 'Canvas', name: 'Game 16:9 720p' }), null, 'game preset');
+});

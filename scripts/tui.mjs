@@ -45,6 +45,7 @@ import { pickProbe, pickReference } from './lib/pick.mjs';
 import { lanAddresses, phoneUrl, reachable } from './lib/lan.mjs';
 import { qrHalfBlocks } from './lib/qr.mjs';
 import { createFrameSettler } from './lib/frame.mjs';
+import { deviceProfile, applyDeviceProfile } from './lib/emulate.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ESC = '\x1b';
@@ -231,6 +232,8 @@ async function launchBrowser(chromium) {
 
 // ---------------------------------------------------------------- state ----
 let browser, page;
+let cdp = null;            // the page's CDP session, for what Playwright can't change on an open page
+let chromeMajor = '140';   // the driving browser's version, which an Android preset claims
 let cw = 10, ch = 20, termBg = [12, 12, 12];
 let caps = { sixel: false, kitty: false, tmux: false };
 let tickTimer = null;
@@ -583,7 +586,7 @@ async function applyControl(s) {
     statusMsg = 'loading';
     drawFooter(lastLayout || layout());
     try {
-      await page.setViewportSize(vp());     // load at the new size, not the old page's
+      await sizePage();     // load at the new size and identity, not the old page's
       await page.goto(currentTarget, { waitUntil: 'domcontentloaded', timeout: 30000 });
     } catch {
       statusMsg = '!no server at ' + currentTarget;
@@ -2147,19 +2150,28 @@ const enqueue = (events, dispatch) => {
 };
 
 // ----------------------------------------------------------------- main ----
+/**
+ * Sizes the page to the current device and makes it present itself as that
+ * device: user agent, platform, touch and the mobile flag (see lib/emulate.mjs).
+ */
+async function sizePage() {
+  await page.setViewportSize(vp());
+  if (cdp) await applyDeviceProfile(cdp, deviceProfile(device(), chromeMajor), vp(), SHOT_SCALE);
+}
+
 async function applyViewport() {
   viewGen++;              // a frame already in flight is for the old viewport
   // Inside the try too: a resize landing mid-navigation, or after the browser
   // has gone, throws here, and nothing upstream of a resize event catches it.
   try {
-    await page.setViewportSize(vp());
+    await sizePage();
     // Chrome occasionally reports the old innerWidth for a beat after a resize
     // that coincides with a navigation; ask, and resize again if it disagrees.
     const want = vp();
     const got = await page.evaluate(() => [innerWidth, innerHeight]);
     if (got[0] !== want.width || got[1] !== want.height) {
       await new Promise(r => setTimeout(r, 150));
-      await page.setViewportSize(vp());   // not want: the device may have changed meanwhile
+      await sizePage();   // not want: the device may have changed meanwhile
     }
   } catch { /* mid-navigation */ }
   lastShot = null;
@@ -2202,6 +2214,11 @@ async function main() {
   // instead of jagged. Snapshots are written at this 2x size too.
   const ctx = await browser.newContext({ viewport: vp(), deviceScaleFactor: SHOT_SCALE });
   page = await ctx.newPage();
+  chromeMajor = browser.version().split('.')[0] || chromeMajor;
+  try {
+    cdp = await ctx.newCDPSession(page);
+    await sizePage();      // a phone preset is a phone from the first request
+  } catch { cdp = null; /* not Chromium: the size alone, as before */ }
   if (renderMode === 'sixel' || renderMode === 'kitty') warmMenuTab().catch(() => { menuTabP = null; });
 
   // Text mode has no picture to paint a welcome screen with.
