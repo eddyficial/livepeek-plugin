@@ -72,3 +72,22 @@ export function cleanup() {
   for (const s of servers) { try { s.close(); s.closeAllConnections?.(); } catch { /* ignore */ } }
   try { fs.rmSync(TMP, { recursive: true, force: true }); } catch { /* ignore */ }
 }
+
+/** Load the selected suites and release the test resources. */
+export async function runSuites(load, dispose = cleanup) {
+  try {
+    await load();
+  } finally {
+    await dispose();
+  }
+}
+
+/** Summarize the observed counts and decide the run status. */
+export function suiteOutcome({ ok, FAIL: failed, skip: skipped }, requireBrowser, complete) {
+  const summary = `${ok} ok, ${failed} failed, ${skipped} skipped`;
+  const passed = complete && failed === 0 && (!requireBrowser || skipped === 0);
+  const evidence = requireBrowser
+    ? JSON.stringify({ mode: 'require-browser', ok, failed, skipped, complete, passed })
+    : null;
+  return { summary, exitCode: passed ? 0 : 1, evidence };
+}

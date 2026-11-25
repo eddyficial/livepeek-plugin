@@ -14,31 +14,86 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { probeTerminal, pickRenderer } from './lib/caps.mjs';
 import { locateDriver } from './lib/driver.mjs';
-import { STATE_DIR } from './lib/state.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-let failed = 0, warned = 0;
-const report = (level, thing, detail, hint) => {
-  if (level === 'FAIL') failed++;
-  if (level === 'warn') warned++;
-  // levels are padded to the width of "FAIL" so the details line up
-  console.log(`${level.padEnd(4)} ${thing}: ${detail}`);
-  if (hint && level !== 'ok') console.log(`       fix: ${hint}`);
-};
+const driverInstall = 'npm add --global playwright-core@1.63.0';
+const recheck = 'livepeek --doctor';
 
-// ----------------------------------------------------------------- node ----
-function checkNode() {
-  const major = parseInt(process.versions.node.split('.')[0], 10);
-  if (major >= 18) return report('ok', 'node', `v${process.versions.node}`);
-  report('FAIL', 'node', `v${process.versions.node} is too old (need 18 or newer)`,
-    'install a current Node.js (18 or newer) from the Node.js download page');
+function formatCheck(level, thing, detail, hint) {
+  const line = `${level.padEnd(4)} ${thing}: ${detail}`;
+  return hint && level !== 'ok' ? [line, `       fix: ${hint}`] : [line];
 }
 
-// -------------------------------------------------------------- browser ----
+const plural = (n, word) => `${n} ${word}${n > 1 ? 's' : ''}`;
+
+/** Evaluate the collected facts without I/O. */
+export function doctorVerdict({ nodeVersion, browser, driver, env, graphics, npmVersion, home }) {
+  const lines = [];
+  let failed = 0, warned = 0;
+  const report = (level, thing, detail, hint) => {
+    if (level === 'FAIL') failed++;
+    if (level === 'warn') warned++;
+    lines.push(...formatCheck(level, thing, detail, hint));
+  };
+
+  const nodeSupported = parseInt(nodeVersion.split('.')[0], 10) >= 20;
+  if (nodeSupported) report('ok', 'node', `v${nodeVersion}`);
+  else report('FAIL', 'node', `v${nodeVersion} is too old (need 20 or newer)`,
+    'install a current Node.js (20 or newer) from the Node.js download page');
+
+  if (browser) report('ok', 'browser', browser);
+  else report('FAIL', 'browser', 'no Chrome, Chromium or Edge found in the usual places',
+    'install Chrome or Edge (Windows already ships with Edge)');
+
+  if (driver) report('ok', 'driver', `playwright-core ${driver.version} (${driver.directory})`);
+  else report('FAIL', 'driver', `not installed. Run: ${driverInstall}`);
+
+  const vscode = (env.TERM_PROGRAM || '').toLowerCase() === 'vscode';
+  const host = detectHost(env, vscode);
+  if (host) report('ok', 'multiplexer', host);
+  else if (vscode) report('warn', 'multiplexer', 'VS Code terminal: split it by hand and run `livepeek --here` in the new half',
+    'or run tmux inside it; for pictures enable terminal.integrated.enableImages');
+  else report('warn', 'multiplexer', 'none detected, so there is no pane to split',
+    'start tmux first (works everywhere), or run livepeek with --here to use this pane');
+
+  if (!graphics) report('warn', 'graphics', 'not tested (stdin is not a terminal)',
+    'rerun livepeek --doctor in an interactive terminal');
+  else {
+    const renderer = pickRenderer(graphics);
+    const support = [graphics.kitty && 'kitty', graphics.sixel && 'sixel'].filter(Boolean).join(' + ') || 'no kitty or sixel';
+    const cell = `${graphics.cw}x${graphics.ch}px cells${graphics.cellFrom ? ` (from ${graphics.cellFrom})` : ' (guessed)'}`;
+    const detail = `${support}; ${cell}; would use ${renderer}`;
+    if (renderer === 'blocks') report('warn', 'graphics', detail,
+      'half-blocks work but are coarse; try Windows Terminal 1.22+, Kitty, WezTerm or Ghostty' +
+      (graphics.tmux ? ', and set -g allow-passthrough on in tmux' : ''));
+    else report('ok', 'graphics', detail);
+  }
+
+  if (npmVersion) report('ok', 'npm', `v${npmVersion}`);
+  else report(driver ? 'warn' : 'FAIL', 'npm', 'not found on PATH',
+    'install Node.js with npm included; livepeek needs it to start dev servers');
+
+  if (home.error) report('FAIL', '~/.livepeek', `cannot write to ${home.directory}: ${home.error}`,
+    'make that folder writable; livepeek keeps its pane state and project list there');
+  else report('ok', '~/.livepeek', `writable (${home.directory})`);
+
+  let next = recheck;
+  if (nodeSupported && npmVersion) {
+    if (!driver) next = driverInstall;
+    else if (!failed && graphics) next = host ? 'livepeek' : 'livepeek --here';
+  }
+  lines.push(`next: ${next}`, '');
+  if (failed) lines.push(`${plural(failed, 'blocking problem')}${warned ? `, ${plural(warned, 'warning')}` : ''}: livepeek cannot run yet.`);
+  else if (!graphics) lines.push(`${plural(warned, 'warning')}: interactive graphics not tested.`);
+  else if (warned) lines.push(`livepeek can run, with ${plural(warned, 'warning')}.`);
+  else lines.push('all good: livepeek can run here.');
+  return { lines, exitCode: failed ? 1 : 0 };
+}
+
 // Same list as findSystemBrowser in tui.mjs. Keep the two in step.
 function findSystemBrowser() {
   const configured = process.env.LIVEPEEK_BROWSER
@@ -69,117 +124,92 @@ function findSystemBrowser() {
   return candidates.find(p => { try { return fs.existsSync(p); } catch { return false; } }) || null;
 }
 
-function checkBrowser() {
-  const exe = findSystemBrowser();
-  if (exe) return report('ok', 'browser', exe);
-  report('FAIL', 'browser', 'no Chrome, Chromium or Edge found in the usual places',
-    'install Chrome or Edge (Windows already ships with Edge)');
-}
-
-// --------------------------------------------------------------- driver ----
 // Found the way tui.mjs finds it: project, next to the scripts, or a global
 // npm global folder, so the two never disagree.
-function checkDriver() {
+function findDriver() {
   const where = locateDriver(__dirname);
-  if (!where) return report('FAIL', 'driver', 'not installed. Run: npm add --global playwright-core@1.63.0');
+  if (!where) return null;
 
   let version = 'unknown version';
   try { version = JSON.parse(fs.readFileSync(where, 'utf8')).version; } catch { /* keep default */ }
-  report('ok', 'driver', `playwright-core ${version} (${path.dirname(where)})`);
+  return { version, directory: path.dirname(where) };
 }
 
-// ---------------------------------------------------------- multiplexer ----
 // Same order as detectHost in pane.mjs: tmux can run inside the others, so it wins.
-function detectHost() {
+function detectHost(env, vscode) {
   // A VS Code terminal inherits the environment VS Code was launched from,
   // so ZELLIJ or WT_SESSION may be set while no such pane is anywhere near
   // this terminal. TERM_PROGRAM is set by the innermost program: VS Code
   // says vscode, and tmux overrides it with tmux when it is really inside.
-  const vscode = (process.env.TERM_PROGRAM || '').toLowerCase() === 'vscode';
-  if (process.env.TMUX && !vscode) return 'tmux';
+  if (env.TMUX && !vscode) return 'tmux';
   if (vscode) return null;
-  if (process.env.ZELLIJ) return 'zellij';
-  if (process.env.KITTY_LISTEN_ON) return 'kitty';
-  if (process.env.WEZTERM_PANE) return 'wezterm';
-  if (process.env.WT_SESSION) return 'wt';
+  if (env.ZELLIJ) return 'zellij';
+  if (env.KITTY_LISTEN_ON) return 'kitty';
+  if (env.WEZTERM_PANE) return 'wezterm';
+  if (env.WT_SESSION) return 'wt';
   return null;
 }
 
-function checkHost() {
-  const host = detectHost();
-  if (host) return report('ok', 'multiplexer', host);
-  if ((process.env.TERM_PROGRAM || '').toLowerCase() === 'vscode') {
-    report('warn', 'multiplexer', 'VS Code terminal: split it by hand and run `livepeek --here` in the new half',
-      'or run tmux inside it; for pictures enable terminal.integrated.enableImages');
-  } else
-  report('FAIL', 'multiplexer', 'none detected, so there is no pane to split',
-    'start tmux first (works everywhere), or run livepeek with --here to use this pane');
+// Ask the terminal only when its replies can arrive on stdin.
+export async function collectGraphics(isTTY, probe) {
+  if (!isTTY) return null;
+  return probe();
 }
 
-// ------------------------------------------------------------- graphics ----
-async function checkGraphics() {
-  if (!process.stdin.isTTY) return report('ok', 'graphics', 'skipped (not a terminal)');
-
-  // the terminal's replies arrive on stdin, so it has to be raw or they get
-  // echoed onto the screen and held back until enter
-  process.stdin.setRawMode?.(true);
-  process.stdin.resume();
-  const caps = await probeTerminal();
-  process.stdin.setRawMode?.(false);
-  process.stdin.pause();
-
-  const renderer = pickRenderer(caps);
-  const support = [caps.kitty && 'kitty', caps.sixel && 'sixel'].filter(Boolean).join(' + ') || 'no kitty or sixel';
-  const cell = `${caps.cw}x${caps.ch}px cells${caps.cellFrom ? ` (from ${caps.cellFrom})` : ' (guessed)'}`;
-  const detail = `${support}; ${cell}; would use ${renderer}`;
-
-  if (renderer === 'blocks') {
-    return report('warn', 'graphics', detail,
-      'half-blocks work but are coarse; try Windows Terminal 1.22+, Kitty, WezTerm or Ghostty' +
-      (caps.tmux ? ', and set -g allow-passthrough on in tmux' : ''));
-  }
-  report('ok', 'graphics', detail);
-}
-
-// ------------------------------------------------------------------ npm ----
-function checkNpm() {
-  // shell: true so Windows finds npm.cmd
-  const r = spawnSync('npm', ['--version'], { shell: true, encoding: 'utf8', windowsHide: true });
-  const version = (r.stdout || '').trim();
-  if (r.status === 0 && version) return report('ok', 'npm', `v${version}`);
-  // with the driver already in place, npm only matters for starting dev servers
-  const haveDriver = !!locateDriver(__dirname);
-  report(haveDriver ? 'warn' : 'FAIL', 'npm', 'not found on PATH',
-    'install Node.js with npm included; livepeek needs it to start dev servers');
-}
-
-// ----------------------------------------------------------------- home ----
-function checkHome() {
-  const dir = STATE_DIR;
+async function probeGraphics() {
+  const { stdin } = process;
+  const wasRaw = !!stdin.isRaw;
   try {
-    fs.mkdirSync(dir, { recursive: true });
-    const probe = path.join(dir, `.doctor-${process.pid}`);
+    stdin.setRawMode?.(true);
+    stdin.resume();
+    return await probeTerminal();
+  } finally {
+    stdin.setRawMode?.(wasRaw);
+    stdin.pause();
+  }
+}
+
+function findNpmVersion() {
+  // shell: true so Windows finds npm.cmd
+  const result = spawnSync('npm', ['--version'], { shell: true, encoding: 'utf8', windowsHide: true });
+  return result.status === 0 ? (result.stdout || '').trim() : '';
+}
+
+function checkHome(directory) {
+  try {
+    fs.mkdirSync(directory, { recursive: true });
+    const probe = path.join(directory, `.doctor-${process.pid}`);
     fs.writeFileSync(probe, 'ok');
     fs.unlinkSync(probe);
-    report('ok', '~/.livepeek', `writable (${dir})`);
-  } catch (e) {
-    report('FAIL', '~/.livepeek', `cannot write to ${dir}: ${e.code || e.message}`,
-      'make that folder writable; livepeek keeps its pane state and project list there');
+    return { directory, error: null };
+  } catch (error) {
+    return { directory, error: error.code || error.message };
   }
 }
 
-// ----------------------------------------------------------------- main ----
-checkNode();
-checkBrowser();
-checkDriver();
-checkHost();
-await checkGraphics();
-checkNpm();
-checkHome();
+async function main() {
+  const { STATE_DIR } = await import('./lib/state.mjs');
+  const facts = {
+    nodeVersion: process.versions.node,
+    browser: findSystemBrowser(),
+    driver: findDriver(),
+    env: process.env,
+    graphics: await collectGraphics(process.stdin.isTTY, probeGraphics),
+    npmVersion: findNpmVersion(),
+    home: checkHome(STATE_DIR),
+  };
+  const { lines, exitCode } = doctorVerdict(facts);
+  console.log(lines.join('\n'));
+  process.exitCode = exitCode;
+}
 
-const plural = (n, w) => `${n} ${w}${n > 1 ? 's' : ''}`;
-console.log('');
-if (failed) console.log(`${plural(failed, 'blocking problem')}${warned ? `, ${plural(warned, 'warning')}` : ''}: livepeek cannot run yet.`);
-else if (warned) console.log(`livepeek can run, with ${plural(warned, 'warning')}.`);
-else console.log('all good: livepeek can run here.');
-process.exit(failed ? 1 : 0);
+function isEntryPoint(entry) {
+  if (!entry) return false;
+  try {
+    return pathToFileURL(fs.realpathSync.native(entry)).href === import.meta.url;
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryPoint(process.argv[1])) await main();
