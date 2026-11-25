@@ -480,7 +480,7 @@ It drives a real browser, so it shows what a browser shows, and only that.
 
 ## When something is wrong
 
-`livepeek --doctor` (or `/livepeek:livepeek --doctor`) checks everything livepeek needs and says which renderer your terminal will get. Run it first if the pane looks like coloured noise or never opens.
+`livepeek --doctor` (or `/livepeek:livepeek --doctor`) checks the Node.js 20+ requirement and other prerequisites, then prints the next command to run. Without a supported splitter, it can suggest `livepeek --here` for the current pane. It predicts the renderer after probing an interactive terminal. With redirected input, graphics are untested and the next command may ask you to rerun the check interactively. An exit code of 0 means no blocking prerequisite was found.
 
 The pane also tells you when the page is unwell: a red `2 errors` in the footer means the page threw or logged `console.error` (press `e` to read them), and `page not responding` means the browser stopped answering, which usually means a tight loop in your code.
 
