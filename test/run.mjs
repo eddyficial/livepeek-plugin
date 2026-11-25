@@ -13,12 +13,17 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { results, cleanup } from './helpers.mjs';   // must come first: sets the temp HOME
+import { results, runSuites } from './helpers.mjs';   // must come first: sets the temp HOME
 
-const here = path.dirname(fileURLToPath(import.meta.url));
-const rest = fs.readdirSync(here).filter(f => f.endsWith('.mjs') && !['helpers.mjs', 'run.mjs', 'unit.mjs', 'browser.mjs'].includes(f)).sort();
-for (const f of ['unit.mjs', ...rest, 'browser.mjs']) await import(pathToFileURL(path.join(here, f)).href);
-
-cleanup();
+try {
+  await runSuites(async () => {
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    const rest = fs.readdirSync(here).filter(f => f.endsWith('.mjs') && !['helpers.mjs', 'run.mjs', 'unit.mjs', 'browser.mjs'].includes(f)).sort();
+    for (const f of ['unit.mjs', ...rest, 'browser.mjs']) await import(pathToFileURL(path.join(here, f)).href);
+  });
+} catch (error) {
+  console.error(error);
+  process.exitCode = 1;
+}
 console.log(`\n${results.ok} ok, ${results.FAIL} failed, ${results.skip} skipped`);
-process.exit(results.FAIL ? 1 : 0);
+if (results.FAIL) process.exitCode = 1;

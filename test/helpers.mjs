@@ -72,3 +72,12 @@ export function cleanup() {
   for (const s of servers) { try { s.close(); s.closeAllConnections?.(); } catch { /* ignore */ } }
   try { fs.rmSync(TMP, { recursive: true, force: true }); } catch { /* ignore */ }
 }
+
+/** Load the selected suites and release the test resources. */
+export async function runSuites(load, dispose = cleanup) {
+  try {
+    await load();
+  } finally {
+    await dispose();
+  }
+}
