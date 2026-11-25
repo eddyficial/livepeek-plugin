@@ -81,3 +81,13 @@ export async function runSuites(load, dispose = cleanup) {
     await dispose();
   }
 }
+
+/** Summarize the observed counts and decide the run status. */
+export function suiteOutcome({ ok, FAIL: failed, skip: skipped }, requireBrowser, complete) {
+  const summary = `${ok} ok, ${failed} failed, ${skipped} skipped`;
+  const passed = complete && failed === 0 && (!requireBrowser || skipped === 0);
+  const evidence = requireBrowser
+    ? JSON.stringify({ mode: 'require-browser', ok, failed, skipped, complete, passed })
+    : null;
+  return { summary, exitCode: passed ? 0 : 1, evidence };
+}

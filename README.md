@@ -496,6 +496,8 @@ node -e "try{const s=JSON.parse(require('child_process').execSync('livepeek --st
 
 `node test/run.mjs` runs the unit, launcher and browser tests. It needs no terminal multiplexer; the browser tests use whatever Chrome or Edge it finds and skip if there is none, or if `playwright-core` cannot be resolved from the repo. The same suite runs on Windows and Linux in GitHub Actions on every push.
 
+For release verification, run `node test/run.mjs --require-browser` or `npm test -- --require-browser`. Any skip causes this run to fail. Check for exit code 0, a final JSON line with `complete` and `passed` both `true`, and passing entries for all three browser tests.
+
 ## What livepeek runs
 
 Everything livepeek does, so you can check it before installing. It collects and sends nothing; see [PRIVACY.md](PRIVACY.md).

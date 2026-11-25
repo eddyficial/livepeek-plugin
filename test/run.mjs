@@ -13,8 +13,10 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { results, runSuites } from './helpers.mjs';   // must come first: sets the temp HOME
+import { results, runSuites, suiteOutcome } from './helpers.mjs';   // must come first: sets the temp HOME
 
+const requireBrowser = process.argv.includes('--require-browser', 2);
+let complete = true;
 try {
   await runSuites(async () => {
     const here = path.dirname(fileURLToPath(import.meta.url));
@@ -23,7 +25,9 @@ try {
   });
 } catch (error) {
   console.error(error);
-  process.exitCode = 1;
+  complete = false;
 }
-console.log(`\n${results.ok} ok, ${results.FAIL} failed, ${results.skip} skipped`);
-if (results.FAIL) process.exitCode = 1;
+const { summary, exitCode, evidence } = suiteOutcome(results, requireBrowser, complete);
+console.log(`\n${summary}`);
+if (evidence !== null) console.log(evidence);
+if (requireBrowser || exitCode !== 0) process.exitCode = exitCode;
